@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Terminal UI for open-source and open-weight coding models"
-default-run = "codewhale-tui"
+default-run = "ar-codewhale-tui"
 
 [features]
 default = ["tui", "json", "toml"]
@@ -15,7 +15,7 @@ json = ["schemaui/json"]
 toml = ["schemaui/toml"]
 
 [[bin]]
-name = "codewhale-tui"
+name = "ar-codewhale-tui"
 path = "src/main.rs"
 
 # Legacy alias — forwards to `codewhale-tui` and prints a deprecation

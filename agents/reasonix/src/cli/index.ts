@@ -368,6 +368,44 @@ program
   });
 
 program
+  .command("platform <task>")
+  .description("run reasonix in platform mode, outputting NDJSON events to stdout")
+  .option("--role <role>", "pm | executor", "executor")
+  .option("--session-id <id>", "session identifier for event tracing", "default")
+  .option("-m, --model <id>", t("ui.modelIdHint"))
+  .option("--budget <usd>", t("ui.budgetHintShort"), (v) => Number.parseFloat(v))
+  .option("--transcript <path>", t("ui.transcriptHintShort"))
+  .option(
+    "--mcp <spec>",
+    t("ui.mcpSpecHintShort"),
+    (value: string, previous: string[] = []) => [...previous, value],
+    [] as string[],
+  )
+  .option("--mcp-prefix <str>", t("ui.mcpPrefixHintShort"))
+  .option("--no-config", t("ui.noConfigHint"))
+  .option("--no-proxy", t("ui.noProxyHint"))
+  .action(async (task: string, opts) => {
+    const { platformCommand } = await import("./commands/platform.js");
+    const defaults = await import("./resolve.js").then((m) =>
+      m.resolveDefaults({
+        model: opts.model,
+        mcp: opts.mcp as string[],
+        effort: undefined,
+        noConfig: opts.config === false,
+      }),
+    );
+    await platformCommand({
+      task,
+      role: opts.role as "pm" | "executor",
+      sessionId: opts.sessionId,
+      model: defaults.model,
+      budgetUsd: opts.budget !== undefined ? (Number.isFinite(opts.budget) && opts.budget > 0 ? opts.budget : undefined) : undefined,
+      mcp: defaults.mcp,
+      mcpPrefix: opts.mcpPrefix,
+    });
+  });
+
+program
   .command("acp")
   .description("run reasonix as an Agent Client Protocol (ACP) agent on stdio NDJSON JSON-RPC")
   .option("-m, --model <id>", t("ui.modelIdHint"))

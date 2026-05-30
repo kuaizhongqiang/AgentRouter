@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Agentic terminal facade for open-source and open-weight coding models"
 
 [[bin]]
-name = "codewhale"
+name = "ar-codewhale"
 path = "src/main.rs"
 
 # Short-form convenience alias — forwards to `codewhale` silently.

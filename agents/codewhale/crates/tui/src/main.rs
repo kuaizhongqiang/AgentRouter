@@ -1,4 +1,4 @@
-//! CLI entry point for the `DeepSeek` client.
+﻿//! CLI entry point for the `DeepSeek` client.
 
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
@@ -316,6 +316,9 @@ struct ExecArgs {
     /// Output format for exec mode
     #[arg(long, value_enum, default_value_t = ExecOutputFormat::Text)]
     output_format: ExecOutputFormat,
+    /// Enable platform integration mode (output AgentRouter protocol NDJSON events)
+    #[arg(long, default_value_t = false)]
+    platform_mode: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -867,6 +870,8 @@ async fn main() -> Result<()> {
                         args.json,
                         resume_session_id,
                         args.output_format,
+                        args.platform_mode,
+                        args.session_id.clone().unwrap_or_default(),
                     )
                     .await
                 } else if args.json {
@@ -1119,6 +1124,8 @@ async fn run_swebench_command(
                 false,
                 None,
                 args.output_format,
+                false,
+                String::new(),
             )
             .await?;
 
@@ -5067,10 +5074,49 @@ enum ExecStreamEvent {
     Done,
     #[serde(rename = "error")]
     Error { error: String },
+    #[serde(rename = "event")]
+    PlatformEvent {
+        protocol_version: String,
+        session_id: String,
+        event: String,
+        data: serde_json::Value,
+        timestamp: String,
+    },
 }
 
-fn emit_exec_stream_event(event: &ExecStreamEvent) -> Result<()> {
-    println!("{}", serde_json::to_string(event)?);
+fn emit_exec_stream_event(event: &ExecStreamEvent, session_id: &str, platform_mode: bool) -> Result<()> {
+    if platform_mode {
+        match event {
+            ExecStreamEvent::PlatformEvent { .. } => {
+                // PlatformEvent is already in full protocol format, output directly
+                println!("{}", serde_json::to_string(event)?);
+            }
+            _ => {
+                let event_json = serde_json::to_value(event)?;
+                let event_name = match event {
+                    ExecStreamEvent::Content { .. } => "progress",
+                    ExecStreamEvent::ToolUse { .. } => "tool_use",
+                    ExecStreamEvent::ToolResult { .. } => "tool_result",
+                    ExecStreamEvent::SessionCapture { .. } => "session_capture",
+                    ExecStreamEvent::Metadata { .. } => "metadata",
+                    ExecStreamEvent::Done => "completion",
+                    ExecStreamEvent::Error { .. } => "error",
+                    ExecStreamEvent::PlatformEvent { .. } => unreachable!(),
+                };
+                let platform_msg = serde_json::json!({
+                    "protocol_version": "1.0",
+                    "session_id": session_id,
+                    "type": "event",
+                    "event": event_name,
+                    "data": event_json,
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                });
+                println!("{}", platform_msg);
+            }
+        }
+    } else {
+        println!("{}", serde_json::to_string(event)?);
+    }
     Ok(())
 }
 
@@ -5134,6 +5180,8 @@ async fn run_exec_agent(
     json_output: bool,
     resume_session_id: Option<String>,
     output_format: ExecOutputFormat,
+    platform_mode: bool,
+    session_id: String,
 ) -> Result<()> {
     use crate::compaction::CompactionConfig;
     use crate::core::engine::{EngineConfig, spawn_engine};
@@ -5150,6 +5198,26 @@ async fn run_exec_agent(
     let effective_reasoning_effort = route
         .reasoning_effort
         .map(|effort| effort.as_setting().to_string());
+
+    // Emit task:start event if in platform mode
+    let effective_session_id = if session_id.is_empty() {
+        uuid::Uuid::new_v4().to_string()
+    } else {
+        session_id.clone()
+    };
+    if platform_mode {
+        emit_exec_stream_event(
+            &ExecStreamEvent::PlatformEvent {
+                protocol_version: "1.0".to_string(),
+                session_id: effective_session_id.clone(),
+                event: "task:start".to_string(),
+                data: serde_json::json!({}),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+            },
+            &effective_session_id,
+            platform_mode,
+        )?;
+    }
 
     // Compaction defaults to disabled in v0.6.6: the checkpoint-restart cycle
     // architecture (issue #124) handles long-context resets via fresh contexts
@@ -5332,7 +5400,7 @@ async fn run_exec_agent(
             Event::MessageDelta { content, .. } => {
                 summary.output.push_str(&content);
                 if output_format == ExecOutputFormat::StreamJson {
-                    emit_exec_stream_event(&ExecStreamEvent::Content { content })?;
+                    emit_exec_stream_event(&ExecStreamEvent::Content { content }, &effective_session_id, platform_mode)?;
                 } else if !json_output {
                     print!("{content}");
                     stdout.flush()?;
@@ -5352,7 +5420,7 @@ async fn run_exec_agent(
             }
             Event::ToolCallStarted { id, name, input } => {
                 if output_format == ExecOutputFormat::StreamJson {
-                    emit_exec_stream_event(&ExecStreamEvent::ToolUse { name, id, input })?;
+                    emit_exec_stream_event(&ExecStreamEvent::ToolUse { name, id, input }, &effective_session_id, platform_mode)?;
                 } else if !json_output {
                     let summary = summarize_tool_args(&input);
                     if let Some(summary) = summary {
@@ -5385,7 +5453,7 @@ async fn run_exec_agent(
                             } else {
                                 "error".to_string()
                             },
-                        })?;
+                        }, &effective_session_id, platform_mode)?;
                     } else if !json_output {
                         if name == "exec_shell" && !output.content.trim().is_empty() {
                             eprintln!("tool {name} completed");
@@ -5413,7 +5481,7 @@ async fn run_exec_agent(
                             id,
                             output: error_text,
                             status: "error".to_string(),
-                        })?;
+                        }, &effective_session_id, platform_mode)?;
                     } else if !json_output {
                         eprintln!("tool {name} failed: {err}");
                     }
@@ -5474,7 +5542,7 @@ async fn run_exec_agent(
                 if output_format == ExecOutputFormat::StreamJson {
                     emit_exec_stream_event(&ExecStreamEvent::Error {
                         error: envelope.message,
-                    })?;
+                    }, &effective_session_id, platform_mode)?;
                 } else if !json_output {
                     eprintln!("error: {}", envelope.message);
                 }
@@ -5517,7 +5585,7 @@ async fn run_exec_agent(
                     if let Some(id) = saved_session_id.as_ref() {
                         emit_exec_stream_event(&ExecStreamEvent::SessionCapture {
                             content: id.clone(),
-                        })?;
+                        }, &effective_session_id, platform_mode)?;
                     }
                     emit_exec_stream_event(&ExecStreamEvent::Metadata {
                         meta: ExecStreamMeta {
@@ -5527,8 +5595,8 @@ async fn run_exec_agent(
                             session_id: saved_session_id.unwrap_or_default(),
                             status: summary.status.clone(),
                         },
-                    })?;
-                    emit_exec_stream_event(&ExecStreamEvent::Done)?;
+                    }, &effective_session_id, platform_mode)?;
+                    emit_exec_stream_event(&ExecStreamEvent::Done, &effective_session_id, platform_mode)?;
                 }
                 let _ = engine_handle.send(Op::Shutdown).await;
                 break;

@@ -1554,7 +1554,7 @@ fn build_tui_command(
 fn exit_with_tui_status(status: std::process::ExitStatus) -> Result<()> {
     match status.code() {
         Some(code) => std::process::exit(code),
-        None => bail!("codewhale-tui terminated by signal"),
+        None => bail!("ar-codewhale-tui terminated by signal"),
     }
 }
 
@@ -1566,7 +1566,7 @@ fn delegate_simple_tui(args: Vec<String>) -> Result<()> {
         .map_err(|err| anyhow!("{}", tui_spawn_error(&tui, &err)))?;
     match status.code() {
         Some(code) => std::process::exit(code),
-        None => bail!("codewhale-tui terminated by signal"),
+        None => bail!("ar-codewhale-tui terminated by signal"),
     }
 }
 
@@ -1574,23 +1574,23 @@ fn tui_spawn_error(tui: &Path, err: &io::Error) -> String {
     format!(
         "failed to spawn companion TUI binary at {}: {err}\n\
 \n\
-The `codewhale` dispatcher found a `codewhale-tui` file, but the OS refused \
+The `codewhale` dispatcher found a `ar-codewhale-tui` file, but the OS refused \
 to execute it. Common fixes:\n\
   - Reinstall with `npm install -g codewhale`, or run `codewhale update`.\n\
-  - On Windows, run `where codewhale` and `where codewhale-tui`; both should \
+  - On Windows, run `where codewhale` and `where ar-codewhale-tui`; both should \
 come from the same install directory.\n\
   - If you downloaded release assets manually, keep both `codewhale` and \
-`codewhale-tui` binaries together and make sure the TUI binary is executable.\n\
-  - Set DEEPSEEK_TUI_BIN to the absolute path of a working `codewhale-tui` \
+`ar-codewhale-tui` binaries together and make sure the TUI binary is executable.\n\
+  - Set DEEPSEEK_TUI_BIN to the absolute path of a working `ar-codewhale-tui` \
 binary.",
         tui.display()
     )
 }
 
-/// Resolve the sibling `codewhale-tui` executable next to the running
+/// Resolve the sibling `ar-codewhale-tui` executable next to the running
 /// dispatcher. Honours platform executable suffix (`.exe` on Windows) so
 /// the npm-distributed Windows package — which ships
-/// `bin/downloads/codewhale-tui.exe` — is found by `Path::exists` (#247).
+/// `bin/downloads/ar-codewhale-tui.exe` — is found by `Path::exists` (#247).
 ///
 /// `DEEPSEEK_TUI_BIN` is consulted first as an explicit override for
 /// custom installs and CI test layouts. On Windows we additionally try
@@ -1614,39 +1614,39 @@ fn locate_sibling_tui_binary() -> Result<PathBuf> {
     }
 
     // Build a stable error path so the user sees the platform-correct
-    // expected name, not "codewhale-tui" on Windows.
-    let expected = current.with_file_name(format!("codewhale-tui{}", std::env::consts::EXE_SUFFIX));
+    // expected name, not "ar-codewhale-tui" on Windows.
+    let expected = current.with_file_name(format!("ar-codewhale-tui{}", std::env::consts::EXE_SUFFIX));
     bail!(
-        "Companion `codewhale-tui` binary not found at {}.\n\
+        "Companion `ar-codewhale-tui` binary not found at {}.\n\
 \n\
 The `codewhale` dispatcher delegates interactive sessions to a sibling \
-`codewhale-tui` binary. To fix this, install one of:\n\
+`ar-codewhale-tui` binary. To fix this, install one of:\n\
   • npm:    npm install -g codewhale                (downloads both binaries)\n\
-  • cargo:  cargo install codewhale-cli codewhale-tui --locked\n\
+  • cargo:  cargo install codewhale-cli ar-codewhale-tui --locked\n\
   • GitHub Releases: download BOTH `codewhale-<platform>` AND \
-`codewhale-tui-<platform>` from https://github.com/Hmbown/CodeWhale/releases/latest \
+`ar-codewhale-tui-<platform>` from https://github.com/Hmbown/CodeWhale/releases/latest \
 and place them in the same directory.\n\
 \n\
-Or set DEEPSEEK_TUI_BIN to the absolute path of an existing `codewhale-tui` binary.",
+Or set DEEPSEEK_TUI_BIN to the absolute path of an existing `ar-codewhale-tui` binary.",
         expected.display()
     );
 }
 
 /// Return the first existing sibling-binary path under any of the names
-/// `codewhale-tui` might use on this platform. Pure function to keep
+/// `ar-codewhale-tui` might use on this platform. Pure function to keep
 /// `locate_sibling_tui_binary` testable.
 fn sibling_tui_candidate(dispatcher: &Path) -> Option<PathBuf> {
     // Primary: platform-correct name. EXE_SUFFIX is "" on Unix and ".exe"
     // on Windows.
     let primary =
-        dispatcher.with_file_name(format!("codewhale-tui{}", std::env::consts::EXE_SUFFIX));
+        dispatcher.with_file_name(format!("ar-codewhale-tui{}", std::env::consts::EXE_SUFFIX));
     if primary.is_file() {
         return Some(primary);
     }
     // Windows fallback: a user who manually renamed `.exe` away (per the
     // workaround in #247) still launches successfully under the new code.
     if cfg!(windows) {
-        let suffixless = dispatcher.with_file_name("codewhale-tui");
+        let suffixless = dispatcher.with_file_name("ar-codewhale-tui");
         if suffixless.is_file() {
             return Some(suffixless);
         }
@@ -3119,8 +3119,8 @@ mod tests {
     }
 
     /// Regression for issue #247: on Windows the dispatcher must find the
-    /// sibling `codewhale-tui.exe`, not bail out looking for an
-    /// extension-less `codewhale-tui`. The candidate resolver also accepts
+    /// sibling `ar-codewhale-tui.exe`, not bail out looking for an
+    /// extension-less `ar-codewhale-tui`. The candidate resolver also accepts
     /// the suffix-less name on Windows so users who manually renamed the
     /// file as a workaround keep working after the upgrade.
     #[test]
@@ -3137,7 +3137,7 @@ mod tests {
         assert!(sibling_tui_candidate(&dispatcher).is_none());
 
         let target =
-            dispatcher.with_file_name(format!("codewhale-tui{}", std::env::consts::EXE_SUFFIX));
+            dispatcher.with_file_name(format!("ar-codewhale-tui{}", std::env::consts::EXE_SUFFIX));
         std::fs::write(&target, b"").unwrap();
 
         let found = sibling_tui_candidate(&dispatcher).expect("must locate sibling");
@@ -3147,9 +3147,9 @@ mod tests {
     #[test]
     fn dispatcher_spawn_error_names_path_and_recovery_checks() {
         let err = io::Error::new(io::ErrorKind::PermissionDenied, "access is denied");
-        let message = tui_spawn_error(Path::new("C:/tools/codewhale-tui.exe"), &err);
+        let message = tui_spawn_error(Path::new("C:/tools/ar-codewhale-tui.exe"), &err);
 
-        assert!(message.contains("C:/tools/codewhale-tui.exe"));
+        assert!(message.contains("C:/tools/ar-codewhale-tui.exe"));
         assert!(message.contains("access is denied"));
         assert!(message.contains("where codewhale"));
         assert!(message.contains("DEEPSEEK_TUI_BIN"));
@@ -3167,11 +3167,11 @@ mod tests {
         std::fs::write(&dispatcher, b"").unwrap();
 
         // Only the suffixless name exists — emulates the manual rename.
-        let suffixless = dispatcher.with_file_name("codewhale-tui");
+        let suffixless = dispatcher.with_file_name("ar-codewhale-tui");
         std::fs::write(&suffixless, b"").unwrap();
 
         let found = sibling_tui_candidate(&dispatcher)
-            .expect("Windows fallback must locate suffixless codewhale-tui");
+            .expect("Windows fallback must locate suffixless ar-codewhale-tui");
         assert_eq!(found, suffixless);
     }
 

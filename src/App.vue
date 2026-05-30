@@ -33,6 +33,19 @@
 
     <!-- ═══ 中间：对话区 ═══ -->
     <main class="main">
+      <!-- Agent + 模式选择器 -->
+      <div class="toolbar" v-if="currentProject">
+        <div class="toolbar-item">
+          <select v-model="selectedAgent" class="toolbar-select agent-select">
+            <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.label || a.name }}</option>
+          </select>
+        </div>
+        <div class="toolbar-item">
+          <select v-model="selectedMode" class="toolbar-select mode-select">
+            <option v-for="m in modes" :key="m" :value="m">{{ m }}</option>
+          </select>
+        </div>
+      </div>
       <div class="session-tabs" v-if="currentProject">
         <div class="tabs-scroll">
           <button
@@ -50,7 +63,12 @@
 
       <div class="messages" ref="msgRef" v-if="currentSession">
         <div v-for="m in messages" :key="m.id" class="msg" :class="m.role">
-          <div class="msg-role">{{ { user: '你', agent: 'CodeWhale', system: '系统' }[m.role] }}</div>
+          <div class="msg-role">
+            <template v-if="m.role === 'agent'">
+              <span class="agent-badge" :class="'agent-' + (m.agentName || selectedAgent || 'codewhale').toLowerCase()">{{ m.agentName || selectedAgent || 'CodeWhale' }}</span>
+            </template>
+            <template v-else>{{ { user: '你', system: '系统' }[m.role] || m.role }}</template>
+          </div>
           <div class="msg-content">{{ m.content }}</div>
         </div>
       </div>
@@ -61,7 +79,7 @@
       <div class="input-bar" v-if="currentSession">
         <input
           v-model="userInput"
-          placeholder="输入命令给 CodeWhale..."
+          :placeholder="'输入命令给 ' + (selectedAgent || 'Agent') + '...'"
           @keydown.enter="send"
           :disabled="agentStatus !== 'online'"
         />
@@ -69,7 +87,7 @@
       </div>
       <div class="status-bar">
         <span class="dot" :class="agentStatus"></span>
-        <span class="status-text">{{ { online:'就绪', offline:'离线', starting:'启动中' }[agentStatus] }}</span>
+        <span class="status-text">{{ selectedAgent || 'Agent' }} {{ { online:'就绪', offline:'离线', starting:'启动中' }[agentStatus] }}</span>
         <button @click="doctor" class="btn-mini">诊断</button>
       </div>
     </main>
@@ -78,10 +96,16 @@
     <aside class="sidebar sidebar-right">
       <div class="sidebar-title"><span>任务</span></div>
       <div class="task-list">
-        <div v-for="t in tasks" :key="t.id" class="task-item" :class="t.status">
-          <span class="task-icon">{{ { pending:'⏳', running:'🔄', completed:'✅', archived:'📦' }[t.status] }}</span>
-          <span class="task-title">{{ t.title }}</span>
-          <span class="task-status">{{ { pending:'排队', running:'运行中', completed:'完成', archived:'已归档' }[t.status] }}</span>
+        <div v-for="t in tasks" :key="t.id" class="task-item" :class="[t.status, t.status === 'running' ? 'running-anim' : '']">
+          <span class="task-icon">{{ { pending:'⏳', running:'🔄', completed:'✅', error:'❌', archived:'📦' }[t.status] || '⏳' }}</span>
+          <div class="task-body">
+            <span class="task-title">{{ t.title }}</span>
+            <div class="task-meta">
+              <span v-if="t.assignee" class="agent-badge agent-badge-sm" :class="'agent-' + t.assignee.toLowerCase()">{{ t.assignee }}</span>
+              <span v-if="t.group" class="task-group">第 {{ t.group }} 组</span>
+            </div>
+          </div>
+          <span class="task-status-tag" :class="t.status">{{ { pending:'排队', running:'运行中', completed:'完成', error:'失败', archived:'已归档' }[t.status] || t.status }}</span>
         </div>
       </div>
       <div class="placeholder small" v-if="tasks.length === 0">暂无任务</div>
@@ -107,6 +131,12 @@ const showNewProject = ref(false)
 const newProjectName = ref('')
 const newProjectPath = ref('')
 const msgRef = ref(null)
+
+// ── Agent 与模式 ──
+const agents = ref([])
+const selectedAgent = ref(null)
+const selectedMode = ref('YOLO')
+const modes = ['YOLO', '审批', '逐步', '预览']
 
 // ── 项目 ──
 
@@ -191,12 +221,12 @@ async function send() {
     if (last && last.role === 'agent') {
       last.content = reply
     } else {
-      messages.value.push({ id: 'tmp', role: 'agent', content: reply, timestamp: Date.now() })
+      messages.value.push({ id: 'tmp', role: 'agent', agentName: selectedAgent.value, content: reply, timestamp: Date.now() })
     }
     scrollDown()
   })
 
-  agent.exec(cmd)
+  agent.exec(selectedAgent.value, cmd)
   await new Promise(r => setTimeout(r, 2000))
 
   if (reply.trim()) {
@@ -207,7 +237,7 @@ async function send() {
 
 // ── 诊断 ──
 
-function doctor() { agent.doctor() }
+function doctor() { if (selectedAgent.value) agent.doctor(selectedAgent.value) }
 
 // ── 生命周期 ──
 
@@ -215,6 +245,16 @@ onMounted(async () => {
   await loadProjects()
   if (agent) {
     agent.onStatus((s) => { agentStatus.value = s })
+    try {
+      agents.value = await agent.list() || []
+    } catch (_) {
+      agents.value = [{ name: 'codewhale', label: 'CodeWhale' }]
+    }
+    if (agents.value.length > 0) {
+      selectedAgent.value = agents.value[0].name || agents.value[0]
+    } else {
+      selectedAgent.value = 'codewhale'
+    }
   }
 })
 </script>
@@ -252,13 +292,8 @@ body {
   display: flex; align-items: center; gap: 6px; padding: 8px 12px;
   font-size: 12px; border-bottom: 1px solid #0f346033; cursor: default;
 }
-.task-item.completed { opacity: 0.6; }
-.task-item.archived { opacity: 0.4; text-decoration: line-through; }
 .task-icon { font-size: 12px; }
-.task-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-status { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #0f3460; }
-.task-item.running .task-status { background: #e65100; color: #ffe0b2; }
-.task-item.completed .task-status { background: #1b5e20; color: #a5d6a7; }
+.task-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
@@ -320,6 +355,57 @@ body {
   background: #16213e; color: #aaa; font-size: 11px; cursor: pointer;
 }
 .btn-mini:hover { color: #e0e0e0; }
+
+/* ── Toolbar 选择器 ── */
+.toolbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: #16213e; border-bottom: 1px solid #0f3460;
+}
+.toolbar-item { display: flex; align-items: center; }
+.toolbar-select {
+  appearance: none; -webkit-appearance: none;
+  padding: 3px 22px 3px 8px; font-size: 12px;
+  border: 1px solid #0f3460; border-radius: 4px;
+  background: #1a1a2e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E") no-repeat right 6px center;
+  color: #e0e0e0; cursor: pointer; outline: none; min-width: 90px;
+}
+.toolbar-select:focus { border-color: #e94560; }
+.toolbar-select option { background: #16213e; color: #e0e0e0; }
+.agent-select { min-width: 100px; }
+.mode-select { min-width: 72px; }
+
+/* ── Agent 徽章 ── */
+.agent-badge {
+  display: inline-block; padding: 1px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; margin-right: 4px;
+}
+.agent-badge-sm { font-size: 10px; padding: 0 6px; border-radius: 8px; }
+.agent-codewhale { background: #1b5e20; color: #a5d6a7; }
+.agent-reasonix { background: #4a148c; color: #ce93d8; }
+.agent-pm { background: #e65100; color: #ffe0b2; }
+.agent-ar-codewhale { background: #1b5e20; color: #a5d6a7; }
+.agent-ar-reasonix { background: #4a148c; color: #ce93d8; }
+
+/* ── 增强任务显示 ── */
+.task-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.task-meta { display: flex; align-items: center; gap: 4px; }
+.task-group { font-size: 10px; color: #888; }
+.task-status-tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #0f3460; white-space: nowrap;
+}
+.task-status-tag.running { background: #e65100; color: #ffe0b2; }
+.task-status-tag.completed { background: #1b5e20; color: #a5d6a7; }
+.task-status-tag.error { background: #b71c1c; color: #ffcdd2; }
+.task-item.completed { opacity: 0.6; }
+.task-item.archived { opacity: 0.4; text-decoration: line-through; }
+.task-item.error { opacity: 0.8; border-left: 3px solid #b71c1c; }
+
+/* ── 运行动画 ── */
+@keyframes running-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.running-anim .task-icon { animation: running-pulse 1s ease-in-out infinite; }
 
 .icon-btn { background: none; border: none; color: #888; font-size: 16px; cursor: pointer; padding: 2px 6px; }
 .icon-btn:hover { color: #e94560; }

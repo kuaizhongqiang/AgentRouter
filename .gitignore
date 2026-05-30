@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-electron
 dist-ssr
 *.local
 
@@ -42,3 +43,4 @@ agents/codewhale/npm/*/node_modules/
 
 # Runtime config
 .codewhale/
+.deepseek/
