@@ -13,6 +13,7 @@ import { getDatabase } from './database/index';
 import { runMigrations } from './database/migrations';
 import { AgentManager } from './agents/manager';
 import { CodeWhaleAdapter } from './agents/codewhale';
+import { ReasonixAdapter } from './agents/reasonix';
 import { registerAllHandlers } from './ipc/index';
 
 let mainWindow: BrowserWindow | null = null;
@@ -53,13 +54,16 @@ app.whenReady().then(async () => {
   // 初始化 Agent 管理器
   agentManager = new AgentManager(mainWindow);
   agentManager.register(new CodeWhaleAdapter());
+  agentManager.register(new ReasonixAdapter());
 
   // 注册所有 IPC 处理器
   registerAllHandlers(ipcMain, agentManager, mainWindow);
 
-  // 发送就绪状态
+  // 发送就绪状态（延时确保前端监听器就位）
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow?.webContents.send('agent:status', { status: 'online', message: 'AgentRouter 已就绪' });
+    setTimeout(() => {
+      mainWindow?.webContents.send('agent:status', { status: 'online', message: 'AgentRouter 已就绪' });
+    }, 500);
   });
 });
 

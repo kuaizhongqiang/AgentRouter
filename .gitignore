@@ -44,3 +44,4 @@ agents/codewhale/npm/*/node_modules/
 # Runtime config
 .codewhale/
 .deepseek/
+.reasonix/

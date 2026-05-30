@@ -42,9 +42,12 @@ export class AgentManager {
     this.adapters.set(adapter.name, adapter);
   }
 
-  /** 列出所有已注册的 Agent 名 */
-  list(): string[] {
-    return Array.from(this.adapters.keys());
+  /** 列出所有已注册的 Agent */
+  list(): Array<{ name: string; label: string }> {
+    return Array.from(this.adapters.values()).map(a => ({
+      name: a.name,
+      label: a.displayName,
+    }));
   }
 
   /** 获取已注册的适配器 */
@@ -97,10 +100,19 @@ export class AgentManager {
         const trimmed = line.trim();
         if (!trimmed) continue;
 
+        // 过滤终端转义序列（CSI 和 OSC 控制码）
+        const sanitized = trimmed
+          .replace(/\x1B\[[\d;]*[A-Za-z@-~]/g, '')    // CSI 序列
+          .replace(/\x1B\].*?(?:\x07|\x1B\\)/g, '')    // OSC 序列
+          .replace(/\x1B[\x40-\x5F]/g, '')             // 单字节 C1 控制码
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '') // 其他控制字符
+          .trim();
+        if (!sanitized) continue;
+
         // 尝试解析为 NDJSON 事件
         let event: AgentEvent | null = null;
         try {
-          const parsed = JSON.parse(trimmed);
+          const parsed = JSON.parse(sanitized);
           if (parsed && parsed.type === 'event') {
             event = parsed as AgentEvent;
           }

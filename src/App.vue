@@ -215,20 +215,38 @@ async function send() {
   scrollDown()
 
   let reply = ''
+  let done = false
   const cleanup = agent.onOutput((data) => {
-    reply += data + '\n'
-    const last = messages.value[messages.value.length - 1]
-    if (last && last.role === 'agent') {
-      last.content = reply
-    } else {
-      messages.value.push({ id: 'tmp', role: 'agent', agentName: selectedAgent.value, content: reply, timestamp: Date.now() })
+    // data = { agent, event } | { agent, raw }
+    const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
+    if (text) {
+      reply += text
+      const last = messages.value[messages.value.length - 1]
+      if (last && last.role === 'agent') {
+        last.content = reply
+      } else {
+        messages.value.push({ id: 'tmp', role: 'agent', agentName: selectedAgent.value, content: reply, timestamp: Date.now() })
+      }
+      scrollDown()
     }
-    scrollDown()
+    // 检测完成事件
+    if (data?.event?.event === 'completion' || data?.event?.event === 'error') {
+      done = true
+    }
   })
 
-  agent.exec(selectedAgent.value, cmd)
-  await new Promise(r => setTimeout(r, 2000))
+  try {
+    await agent.exec(selectedAgent.value, cmd, currentSession.value.id, currentProject.value?.id)
+  } catch (err) {
+    reply += `\n[错误] ${err.message || err}`
+    done = true
+  }
 
+  // 等 completion/error 事件或超时 30s
+  const timeout = setTimeout(() => { done = true }, 30000)
+  while (!done) await new Promise(r => setTimeout(r, 100))
+
+  clearTimeout(timeout)
   if (reply.trim()) {
     await db.addMessage(currentSession.value.id, 'agent', reply.trim())
   }
@@ -244,7 +262,7 @@ function doctor() { if (selectedAgent.value) agent.doctor(selectedAgent.value) }
 onMounted(async () => {
   await loadProjects()
   if (agent) {
-    agent.onStatus((s) => { agentStatus.value = s })
+    agent.onStatus((s) => { agentStatus.value = typeof s === 'string' ? s : s.status || 'offline' })
     try {
       agents.value = await agent.list() || []
     } catch (_) {
@@ -255,6 +273,12 @@ onMounted(async () => {
     } else {
       selectedAgent.value = 'codewhale'
     }
+    // Fallback: 如果 2 秒后仍为离线，主动设为 online
+    setTimeout(() => {
+      if (agentStatus.value === 'offline') {
+        agentStatus.value = 'online'
+      }
+    }, 2000)
   }
 })
 </script>
