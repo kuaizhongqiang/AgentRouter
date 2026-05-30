@@ -22,24 +22,19 @@ export interface AgentEvent {
 /**
  * Agent 适配器接口
  */
-export interface AgentAdapter {
-  /** 唯一标识名，如 'codewhale' */
-  readonly name: string;
+export interface AgentExecOptions extends SpawnOptions {
+  mode?: string;
+}
 
-  /** 显示名称 */
+export interface AgentAdapter {
+  readonly name: string;
   readonly displayName: string;
 
   /**
-   * 生成 exec 子进程
    * @param command  用户输入的指令
-   * @param options  spawn 选项（cwd 等）
-   * @returns ChildProcess 实例
+   * @param options  spawn 选项 + 执行模式
    */
-  spawnExec(command: string, options?: SpawnOptions): ChildProcess;
+  spawnExec(command: string, options?: AgentExecOptions): ChildProcess;
 
-  /**
-   * 生成 doctor 诊断子进程
-   * @returns ChildProcess 实例
-   */
   spawnDoctor(options?: SpawnOptions): ChildProcess;
 }

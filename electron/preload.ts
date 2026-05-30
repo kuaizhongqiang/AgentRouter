@@ -18,8 +18,8 @@ contextBridge.exposeInMainWorld('agent', {
    * @param projectId  当前项目 ID
    * @param cwd        工作目录（可选）
    */
-  exec: (agentName: string, command: string, sessionId: string, projectId: string, cwd?: string) =>
-    ipcRenderer.invoke('agent:exec', { agentName, command, sessionId, projectId, cwd }),
+  exec: (agentName: string, command: string, sessionId: string, projectId: string, mode?: string) =>
+    ipcRenderer.invoke('agent:exec', { agentName, command, sessionId, projectId, mode }),
 
   /** 列出可用 Agent */
   list: () => ipcRenderer.invoke('agent:list'),

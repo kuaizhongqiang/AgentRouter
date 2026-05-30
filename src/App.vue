@@ -135,8 +135,8 @@ const msgRef = ref(null)
 // ── Agent 与模式 ──
 const agents = ref([])
 const selectedAgent = ref(null)
-const selectedMode = ref('YOLO')
-const modes = ['YOLO', '审批', '逐步', '预览']
+const selectedMode = ref('对话')
+const modes = ['对话', 'PM 拆解', 'YOLO', '审批', '逐步', '预览']
 
 // ── 项目 ──
 
@@ -236,7 +236,7 @@ async function send() {
   })
 
   try {
-    await agent.exec(selectedAgent.value, cmd, currentSession.value.id, currentProject.value?.id)
+    await agent.exec(selectedAgent.value, cmd, currentSession.value.id, currentProject.value?.id, selectedMode.value)
   } catch (err) {
     reply += `\n[错误] ${err.message || err}`
     done = true
@@ -273,12 +273,16 @@ onMounted(async () => {
     } else {
       selectedAgent.value = 'codewhale'
     }
-    // Fallback: 如果 2 秒后仍为离线，主动设为 online
-    setTimeout(() => {
-      if (agentStatus.value === 'offline') {
+    // Fallback: 每隔 500ms 检查状态，最多 10s 后强制 online
+    let retries = 20
+    const checkStatus = setInterval(() => {
+      if (agentStatus.value !== 'offline') {
+        clearInterval(checkStatus)
+      } else if (--retries <= 0) {
         agentStatus.value = 'online'
+        clearInterval(checkStatus)
       }
-    }, 2000)
+    }, 500)
   }
 })
 </script>

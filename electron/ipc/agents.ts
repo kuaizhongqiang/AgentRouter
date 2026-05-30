@@ -25,10 +25,10 @@ export function registerAgentHandlers(
     command: string;
     sessionId: string;
     projectId: string;
-    cwd?: string;
+    mode?: string;
   }) => {
-    const { agentName, command, sessionId, projectId, cwd } = payload;
-    return manager.exec(agentName, command, sessionId, projectId, cwd);
+    const { agentName, command, sessionId, projectId, mode } = payload;
+    return manager.exec(agentName, command, sessionId, projectId, undefined, mode);
   });
 
   ipcMain.handle('agent:list', async () => {

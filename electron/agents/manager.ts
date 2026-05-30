@@ -12,7 +12,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import type { BrowserWindow } from 'electron';
-import type { AgentAdapter, AgentEvent } from './adapter';
+import type { AgentAdapter, AgentEvent, AgentExecOptions } from './adapter';
 import type { AgentLog } from '../types';
 
 export class AgentManager {
@@ -68,7 +68,8 @@ export class AgentManager {
     command: string,
     sessionId: string,
     projectId: string,
-    cwd?: string
+    cwd?: string,
+    mode?: string
   ): Promise<string> {
     const adapter = this.adapters.get(agentName);
     if (!adapter) {
@@ -85,7 +86,9 @@ export class AgentManager {
     const logPath = path.join(eventsDir, `${agentName}.jsonl`);
 
     // 启动子进程
-    const proc = adapter.spawnExec(command, cwd ? { cwd } : undefined);
+    const execOptions: AgentExecOptions = { ...(cwd ? { cwd } : {}) };
+    if (mode) execOptions.mode = mode;
+    const proc = adapter.spawnExec(command, execOptions);
 
     // 解析 stdout
     let buf = '';
