@@ -32,6 +32,14 @@ release/
 *.sln
 *.sw?
 
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
 # Agent subproject build artifacts
 agents/reasonix/node_modules/
 agents/reasonix/dist/
@@ -45,3 +53,8 @@ agents/codewhale/npm/*/node_modules/
 .codewhale/
 .deepseek/
 .reasonix/
+
+# Local project files (not in remote)
+AGENTS.md
+CODEBUDDY.md
+REASONIX.md
