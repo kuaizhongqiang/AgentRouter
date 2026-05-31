@@ -34,9 +34,13 @@
     "portable": {
       "artifactName": "AgentRouter-${version}.exe"
     },
+    "portable": {
+      "artifactName": "AgentRouter-${version}.exe"
+    },
     "extraMetadata": {
       "main": "dist-electron/main.js"
-    }
+    },
+    "electronDist": "node_modules/electron/dist"
   },
   "dependencies": {
     "pinia": "^3.0.4",

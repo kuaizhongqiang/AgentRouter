@@ -137,9 +137,29 @@ npm run dev
 # Electron + Vite 联调
 npm run electron:dev
 
-# 打包为 Windows portable exe
+# 打包为 Windows 便携版 exe
 npm run electron:build
 ```
+
+## 构建发布版
+
+使用 `build.bat` 一键构建：
+
+```bash
+# 双击运行，或：
+build.bat
+```
+
+输出结构：
+
+```
+release/
+└── AgentRouter-0.1.0/
+    └── AgentRouter-0.1.0.exe    ← 便携版，解压即用
+```
+
+> **注意**：首次构建需要下载依赖工具（~5.6 MB），请确保网络畅通。
+> 如果遇到 `Cannot create symbolic link` 错误，请**以管理员身份运行** `build.bat`。
 
 ### 构建 CLI Agent
 
