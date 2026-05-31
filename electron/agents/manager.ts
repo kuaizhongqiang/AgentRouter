@@ -91,7 +91,8 @@ export class AgentManager {
     sessionId: string,
     projectId: string,
     cwd?: string,
-    mode?: string
+    mode?: string,
+    context?: import('./adapter').SenderMetadata['context']
   ): Promise<string> {
     const adapter = this.adapters.get(agentName);
     if (!adapter) {
@@ -108,8 +109,13 @@ export class AgentManager {
     const logPath = path.join(eventsDir, `${agentName}.jsonl`);
 
     // 启动子进程
-    const execOptions: AgentExecOptions = { ...(cwd ? { cwd } : {}) };
+    const execOptions: import('./adapter').AgentExecOptions = { ...(cwd ? { cwd } : {}) };
     if (mode) execOptions.mode = mode;
+    if (context) {
+      execOptions.context = context;
+      // 通过环境变量注入上下文
+      execOptions.env = { ...process.env, AGENTROUTER_CONTEXT: JSON.stringify(context) };
+    }
     const proc = adapter.spawnExec(command, execOptions);
 
     // 解析 stdout

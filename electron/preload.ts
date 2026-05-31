@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('agent', {
   /** Phase 3: 获取 Agent 标签声明 */
   getManifest: (agentName: string) => ipcRenderer.invoke('agent:manifest', agentName),
 
+  /** Phase 6: Session 回放 */
+  replay: (sessionId: string, projectId: string) => ipcRenderer.invoke('agent:replay', sessionId, projectId),
+
   /**
    * 监听 Agent 输出事件
    * @returns 取消监听的函数

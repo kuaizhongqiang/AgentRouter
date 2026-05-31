@@ -9,6 +9,9 @@ import type { IpcMain, BrowserWindow } from 'electron';
 import type { AgentManager } from '../agents/manager';
 import type { AgentEvent } from '../agents/adapter';
 import { parseTasksFromReply, batchAddTasks } from '../agents/task-parser';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 export function registerAgentHandlers(
   ipcMain: IpcMain,
@@ -64,6 +67,9 @@ export function registerAgentHandlers(
         }
       }
     }
+
+    // Phase 5: suggestion / task:update / task:add / task:cancel 转发到渲染进程（已在上面发送）
+    // 前端通过 onOutput 接收这些事件并处理
   });
 
   ipcMain.handle('agent:exec', async (_e, payload: {
@@ -72,14 +78,15 @@ export function registerAgentHandlers(
     sessionId: string;
     projectId: string;
     mode?: string;
+    context?: import('../agents/adapter').SenderMetadata['context'];
   }) => {
-    const { agentName, command, sessionId, projectId, mode } = payload;
+    const { agentName, command, sessionId, projectId, mode, context } = payload;
 
     // 在 exec 启动前注册上下文
     activeContexts.set(agentName, { sessionId, projectId, mode });
 
     try {
-      return await manager.exec(agentName, command, sessionId, projectId, undefined, mode);
+      return await manager.exec(agentName, command, sessionId, projectId, undefined, mode, context);
     } finally {
       // exec 完成后清理上下文
       activeContexts.delete(agentName);
@@ -101,5 +108,26 @@ export function registerAgentHandlers(
   // Phase 3: 获取 Agent 标签声明
   ipcMain.handle('agent:manifest', async (_e, agentName: string) => {
     return manager.getManifest(agentName);
+  });
+
+  // Phase 6: Session 回放 — 读取 .jsonl 事件文件并逐行返回
+  ipcMain.handle('agent:replay', async (_e, sessionId: string, projectId: string) => {
+    const eventsDir = path.join(os.homedir(), '.agentrouter', 'projects', projectId, 'sessions', sessionId, 'events');
+    if (!fs.existsSync(eventsDir)) return [];
+
+    const files = fs.readdirSync(eventsDir).filter(f => f.endsWith('.jsonl'));
+    const allEvents: AgentEvent[] = [];
+
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(eventsDir, file), 'utf-8');
+      const lines = content.split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        try {
+          allEvents.push(JSON.parse(line));
+        } catch { /* skip malformed lines */ }
+      }
+    }
+
+    return allEvents.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   });
 }

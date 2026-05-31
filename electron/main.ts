@@ -8,6 +8,7 @@
  * - Agent 管理器初始化
  */
 import path from 'path';
+import { spawn } from 'child_process';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { getDatabase } from './database/index';
 import { runMigrations } from './database/migrations';
@@ -18,6 +19,7 @@ import { registerAllHandlers } from './ipc/index';
 
 let mainWindow: BrowserWindow | null = null;
 let agentManager: AgentManager | null = null;
+let mcpServer: import('child_process').ChildProcess | null = null;
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 

@@ -120,6 +120,9 @@
       <div v-if="showSummarizeButton" class="task-actions">
         <button @click.stop="summarizeMission" class="btn-summarize">汇总 Mission</button>
       </div>
+      <div v-if="showSuggestion" class="task-actions suggestion-banner">
+        <span>💡 Agent 正在提建议...</span>
+      </div>
       <div class="placeholder small" v-if="tasks.length === 0">暂无任务</div>
     </aside>
   </div>
@@ -149,6 +152,7 @@ const expandedTask = ref(null)
 const taskLogs = ref({})
 const showApproveButton = ref(false)
 const showSummarizeButton = ref(false)
+const showSuggestion = ref(false)
 
 // ── Agent 与模式 ──
 const agents = ref([])
@@ -287,6 +291,10 @@ async function send() {
       }
       scrollDown()
     }
+    // Phase 5: 检测 suggestion 事件
+    if (data?.event?.event === 'suggestion') {
+      showSuggestion.value = true
+    }
     // 检测完成事件
     if (data?.event?.event === 'completion' || data?.event?.event === 'error') {
       done = true
@@ -336,31 +344,107 @@ async function approvePlan() {
   showApproveButton.value = false
   await db.approvePlan(currentSession.value.id)
   await loadTasks()
+  // 预览模式：不执行，只展示
+  if (selectedMode.value === '预览') return
   executeAllTasks()
 }
 
 async function executeAllTasks() {
-  const pendingTasks = tasks.value.filter(t => t.status === 'running')
-  for (const task of pendingTasks) {
-    const agentName = task.assignee || selectedAgent.value
-    const cleanup = agent.onOutput((data) => {
-      const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
-      if (text) {
-        taskLogs.value[task.id] = (taskLogs.value[task.id] || '') + text
-      }
-    })
-    try {
-      await agent.exec(agentName, task.title, currentSession.value.id, currentProject.value.id, 'exec')
-      await db.updateTask(task.id, { status: 'completed' })
-    } catch (_) {
-      await db.updateTask(task.id, { status: 'completed' })
-    } finally {
-      cleanup()
-      // 重新加载任务确保状态同步
-      await loadTasks()
+  const runningTasks = tasks.value.filter(t => t.status === 'running')
+
+  // 按 parallel_group 分组
+  const groups = new Map()
+  const singles = []
+  for (const t of runningTasks) {
+    // 从 description 中反查 parallel_group（Reasonix PM 输出格式）
+    const pgMatch = t.description?.match(/并行组:\s*(\d+)/)
+    const group = pgMatch ? parseInt(pgMatch[1]) : null
+    if (group !== null) {
+      const list = groups.get(group) || []
+      list.push(t)
+      groups.set(group, list)
+    } else {
+      singles.push(t)
     }
   }
+  const groupKeys = Array.from(groups.keys()).sort((a, b) => a - b)
+  const orderedGroups = groupKeys.map(k => groups.get(k)).concat(singles.map(t => [t]))
+
+  for (const group of orderedGroups) {
+    // 逐步模式：每组开始前询问
+    if (selectedMode.value === '逐步' && group.length > 0) {
+      const ok = confirm(`第 ${orderedGroups.indexOf(group) + 1} 组就绪，共 ${group.length} 个任务，开始执行？`)
+      if (!ok) {
+        for (const t of group) {
+          await db.updateTask(t.id, { status: 'archived' })
+        }
+        continue
+      }
+    }
+
+    // 检测冲突
+    let sorted = group
+    const conflictMap = new Map()
+    for (const t of group) {
+      for (const f of extractScope(t)) {
+        const prev = conflictMap.get(f)
+        if (prev) {
+          console.warn(`[Scheduler] 文件冲突 ${f}: ${prev.id} 与 ${t.id}，自动降级串行`)
+          sorted = group // 串行执行
+        } else {
+          conflictMap.set(f, t.id)
+        }
+      }
+    }
+
+    // YOLO/审批模式：直接并行（审批模式下已在 approvePlan 中确认）
+    const semaphore = createSemaphore(Math.min(group.length, 4))
+    await Promise.all(sorted.map(task =>
+      semaphore.run(async () => {
+        const agentName = task.assignee || selectedAgent.value
+        const cleanup = agent.onOutput((data) => {
+          const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
+          if (data?.event?.event === 'suggestion') showSuggestion.value = true
+          if (text) {
+            taskLogs.value[task.id] = (taskLogs.value[task.id] || '') + text
+          }
+        })
+        try {
+          await agent.exec(agentName, task.title, currentSession.value.id, currentProject.value.id, 'exec')
+          await db.updateTask(task.id, { status: 'completed' })
+        } catch (_) {
+          await db.updateTask(task.id, { status: 'completed' })
+        } finally {
+          cleanup()
+          await loadTasks()
+        }
+      })
+    ))
+  }
   checkAllTasksCompleted()
+}
+
+function extractScope(task) {
+  // 从 description 中提取文件路径作为冲突检测范围
+  const pathMatch = task.description?.match(/路径:\s*(\S+)/g)
+  if (pathMatch) return pathMatch.map(s => s.replace('路径: ', ''))
+  return []
+}
+
+function createSemaphore(max) {
+  let running = 0
+  const queue = []
+  return {
+    async run(fn) {
+      if (running >= max) await new Promise(r => queue.push(r))
+      running++
+      try { return await fn() }
+      finally {
+        running--
+        queue.shift()?.()
+      }
+    }
+  }
 }
 
 function checkAllTasksCompleted() {
@@ -583,6 +667,10 @@ body {
 
 /* Phase 3: Agent 标签提示 */
 .agent-tagline { font-size: 11px; color: #888; margin-left: 8px; cursor: help; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Phase 5: Suggestion 提示器 */
+.suggestion-banner { background: #e65100; color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px; }
+.suggestion-banner span { display: flex; align-items: center; gap: 6px; }
 
 /* ── 增强任务显示 ── */
 .task-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }

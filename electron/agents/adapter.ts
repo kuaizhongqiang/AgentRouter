@@ -59,7 +59,8 @@ export interface AgentEvent {
   id: string;
   session_id: string;
   type: 'event';
-  event: 'task:start' | 'progress' | 'completion' | 'error' | 'cancelled';
+  event: 'task:start' | 'progress' | 'completion' | 'error' | 'cancelled'
+  | 'suggestion' | 'task:update' | 'task:add' | 'task:cancel';
   data: Record<string, unknown>;
   timestamp: string;
   /** Phase 3: 消息来源身份标识 */
@@ -71,6 +72,8 @@ export interface AgentEvent {
  */
 export interface AgentExecOptions extends SpawnOptions {
   mode?: string;
+  /** Phase 4: 上下文范围 — scope/deltas 用于增量读取 */
+  context?: SenderMetadata['context'];
 }
 
 export interface AgentAdapter {
