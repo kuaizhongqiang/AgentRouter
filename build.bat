@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul 2>&1
+cd /d "%~dp0"
 title AgentRouter Build
 
 echo ========================================
@@ -8,9 +9,10 @@ echo ========================================
 echo.
 
 REM Read version from package.json
-for /f "tokens=2 delims=:," %%a in ('findstr /C:version package.json') do set "VER=%%~a"
+for /f "usebackq tokens=2 delims=:," %%a in (`type package.json ^| findstr /C:version`) do set "VER=%%~a"
 set "VER=%VER:"=%"
 set "VER=%VER: =%"
+set "VER=%VER:,=%"
 echo Version: %VER%
 echo.
 
