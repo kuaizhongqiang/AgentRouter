@@ -38,16 +38,11 @@ if %errorlevel% neq 0 (
 echo OK
 echo.
 
-REM Step 3: Package as portable exe
-echo [3/4] Packaging as Windows portable exe...
-echo NOTE: Run as Administrator if you see symlink errors.
-call npx electron-builder --win portable
+REM Step 3: Package as unpacked app directory (no download needed)
+echo [3/4] Packaging app (unpacked)...
+call npx electron-builder --win --dir
 if %errorlevel% neq 0 (
   echo FAILED: electron-builder packaging
-  echo.
-  echo The unpacked app is still available at:
-  echo   release\win-unpacked\AgentRouter.exe
-  echo.
   pause
   exit /b 1
 )
@@ -58,9 +53,9 @@ REM Step 4: Organize output into versioned directory
 echo [4/4] Organizing output...
 set "OUTDIR=release\AgentRouter-%VER%"
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
-if exist "release\AgentRouter-%VER%.exe" (
-  move "release\AgentRouter-%VER%.exe" "%OUTDIR%\" >nul
-  echo Portable exe: %OUTDIR%\AgentRouter-%VER%.exe
+if exist "release\win-unpacked\AgentRouter.exe" (
+  move "release\win-unpacked" "%OUTDIR%\" >nul
+  echo App: %OUTDIR%\win-unpacked\AgentRouter.exe
 )
 echo OK
 echo.

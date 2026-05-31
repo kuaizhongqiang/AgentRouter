@@ -141,7 +141,7 @@ npm run electron:dev
 npm run electron:build
 ```
 
-## 构建发布版
+## 构建
 
 使用 `build.bat` 一键构建：
 
@@ -150,16 +150,17 @@ npm run electron:build
 build.bat
 ```
 
-输出结构：
+构建产物：
 
 ```
 release/
 └── AgentRouter-0.1.0/
-    └── AgentRouter-0.1.0.exe    ← 便携版，解压即用
+    └── win-unpacked/
+        └── AgentRouter.exe    ← 直接双击运行
 ```
 
-> **注意**：首次构建需要下载依赖工具（~5.6 MB），请确保网络畅通。
-> 如果遇到 `Cannot create symbolic link` 错误，请**以管理员身份运行** `build.bat`。
+> **注意**：构建使用 `--dir` 模式（unpacked），不下载任何依赖工具，不需要管理员权限。
+> 如需打包为单一便携 exe 文件，可运行 `npx electron-builder --win portable`（需要下载工具包，中国大陆地区下载较慢）。
 
 ### 构建 CLI Agent
 
