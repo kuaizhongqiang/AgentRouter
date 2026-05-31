@@ -54,10 +54,21 @@ export function loopEventToPlatform(
 ): string[] {
   switch (ev.role) {
     case "assistant_delta":
-      if (ev.content) {
-        return [formatEvent(sessionId, "progress", { message: ev.content })];
+      const lines: string[] = [];
+      // 推理 token → channel: reasoning
+      if (ev.reasoningDelta) {
+        lines.push(formatEvent(sessionId, "progress", { message: ev.reasoningDelta, channel: "reasoning" }));
       }
-      return [];
+      // 可见 token → 普通 progress
+      if (ev.content) {
+        lines.push(formatEvent(sessionId, "progress", { message: ev.content }));
+      }
+      return lines;
+
+    case "reasoning":
+      return ev.reasoningDelta
+        ? [formatEvent(sessionId, "progress", { message: ev.reasoningDelta, channel: "reasoning" })]
+        : [];
 
     case "assistant_final":
       return [];

@@ -69,9 +69,12 @@
               <span class="agent-badge" :class="'agent-' + (m.agentName || selectedAgent || 'codewhale').toLowerCase()">{{ m.agentName || selectedAgent || 'CodeWhale' }}</span>
               <span v-if="m.senderId" class="sender-id">{{ m.senderId }}</span>
             </template>
+            <template v-else-if="m.role === 'reasoning'">
+              <span class="reasoning-label">🧠 推理中</span>
+            </template>
             <template v-else>{{ { user: '你', system: '系统' }[m.role] || m.role }}</template>
           </div>
-          <div class="msg-content">{{ m.content }}</div>
+          <div class="msg-content" :class="{ 'reasoning-content': m.role === 'reasoning' }">{{ m.content }}</div>
         </div>
       </div>
       <div class="placeholder" v-else>
@@ -273,21 +276,34 @@ async function send() {
   let reply = ''
   let done = false
   let senderId = ''
+  let reasoningText = ''
   const cleanup = agent.onOutput((data) => {
     // data = { agent, event } | { agent, raw }
+    const isReasoning = data?.event?.data?.channel === 'reasoning'
     const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
     // Phase 3: 捕获 _sender 身份标识
     if (data?.event?._sender?.id) {
       senderId = data.event._sender.id
     }
     if (text) {
-      reply += text
-      const last = messages.value[messages.value.length - 1]
-      if (last && last.role === 'agent') {
-        last.content = reply
-        if (senderId) last.senderId = senderId
+      if (isReasoning) {
+        // Phase 6: 推理气泡 — 单独累加，不混入消息内容
+        reasoningText += text
+        const last = messages.value[messages.value.length - 1]
+        if (last && last.role === 'reasoning') {
+          last.content = reasoningText
+        } else {
+          messages.value.push({ id: 'tmp', role: 'reasoning', content: reasoningText, timestamp: Date.now() })
+        }
       } else {
-        messages.value.push({ id: 'tmp', role: 'agent', agentName: selectedAgent.value, content: reply, senderId: senderId || undefined, timestamp: Date.now() })
+        reply += text
+        const last = messages.value[messages.value.length - 1]
+        if (last && last.role === 'agent') {
+          last.content = reply
+          if (senderId) last.senderId = senderId
+        } else {
+          messages.value.push({ id: 'tmp', role: 'agent', agentName: selectedAgent.value, content: reply, senderId: senderId || undefined, timestamp: Date.now() })
+        }
       }
       scrollDown()
     }
@@ -667,6 +683,10 @@ body {
 
 /* Phase 3: Agent 标签提示 */
 .agent-tagline { font-size: 11px; color: #888; margin-left: 8px; cursor: help; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Phase 6: 推理气泡 */
+.reasoning-label { color: #7c4dff; font-size: 12px; font-weight: 600; }
+.reasoning-content { color: #b388ff; font-style: italic; background: rgba(124, 77, 255, 0.08); border-radius: 8px; padding: 6px 10px; margin-top: 2px; font-size: 13px; }
 
 /* Phase 5: Suggestion 提示器 */
 .suggestion-banner { background: #e65100; color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px; }
