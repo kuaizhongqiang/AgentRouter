@@ -125,6 +125,10 @@
       </div>
       <div v-if="showSuggestion" class="task-actions suggestion-banner">
         <span>💡 Agent 正在提建议...</span>
+        <div class="suggestion-actions" v-if="suggestionPaused">
+          <button @click.stop="approveSuggestion" class="btn-approve">采纳</button>
+          <button @click.stop="rejectSuggestion" class="btn-reject">拒绝</button>
+        </div>
       </div>
       <div class="placeholder small" v-if="tasks.length === 0">暂无任务</div>
     </aside>
@@ -156,6 +160,7 @@ const taskLogs = ref({})
 const showApproveButton = ref(false)
 const showSummarizeButton = ref(false)
 const showSuggestion = ref(false)
+const suggestionPaused = ref(false)
 
 // ── Agent 与模式 ──
 const agents = ref([])
@@ -310,6 +315,15 @@ async function send() {
     // Phase 5: 检测 suggestion 事件
     if (data?.event?.event === 'suggestion') {
       showSuggestion.value = true
+      // 审批/逐步模式：标记暂停
+      if (data?._meta?.paused) {
+        suggestionPaused.value = true
+      }
+    }
+    // Phase 5: 检测 resume 信号（用户已响应建议）
+    if (data?._meta?.resume) {
+      suggestionPaused.value = false
+      showSuggestion.value = false
     }
     // 检测完成事件
     if (data?.event?.event === 'completion' || data?.event?.event === 'error') {
@@ -466,6 +480,23 @@ function createSemaphore(max) {
 function checkAllTasksCompleted() {
   const allDone = tasks.value.every(t => t.status === 'completed' || t.status === 'archived')
   showSummarizeButton.value = allDone
+}
+
+// Phase 5: 用户响应 suggestion
+async function approveSuggestion() {
+  suggestionPaused.value = false
+  showSuggestion.value = false
+  if (currentSession.value) {
+    await agent.respondSuggestion(currentSession.value.id, true)
+  }
+}
+
+async function rejectSuggestion() {
+  suggestionPaused.value = false
+  showSuggestion.value = false
+  if (currentSession.value) {
+    await agent.respondSuggestion(currentSession.value.id, false)
+  }
 }
 
 async function summarizeMission() {
@@ -691,6 +722,9 @@ body {
 /* Phase 5: Suggestion 提示器 */
 .suggestion-banner { background: #e65100; color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px; }
 .suggestion-banner span { display: flex; align-items: center; gap: 6px; }
+.suggestion-actions { display: flex; gap: 6px; margin-top: 6px; }
+.btn-approve { background: #2e7d32; color: #fff; border: none; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+.btn-reject { background: #c62828; color: #fff; border: none; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
 
 /* ── 增强任务显示 ── */
 .task-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }

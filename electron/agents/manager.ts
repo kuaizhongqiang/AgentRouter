@@ -24,6 +24,9 @@ export class AgentManager {
   /** Phase 3: 全局递增 sender 序列号，确保 id 唯一 */
   private senderSeq = 0;
 
+  /** Phase 5: 会话 → PM 进程映射（用于 suggestion 路由） */
+  private pmProcesses = new Map<string, { agentName: string; proc: import('child_process').ChildProcess }>();
+
   constructor(mainWindow?: BrowserWindow) {
     if (mainWindow) {
       this.mainWindow = mainWindow;
@@ -34,6 +37,22 @@ export class AgentManager {
   getManifest(agentName: string): import('./adapter').AgentManifest | null {
     const adapter = this.adapters.get(agentName);
     return adapter ? adapter.manifest() : null;
+  }
+
+  /** Phase 5: 向 PM 进程写入数据（suggestion 路由） */
+  writeToPm(sessionId: string, data: unknown): boolean {
+    const entry = this.pmProcesses.get(sessionId);
+    if (!entry || !entry.proc.stdin) return false;
+    entry.proc.stdin.write(JSON.stringify(data) + '\n');
+    return true;
+  }
+
+  /** Phase 5: 获取 PM 进程状态 */
+  getPmProcess(sessionId: string): { agentName: string; alive: boolean } | null {
+    const entry = this.pmProcesses.get(sessionId);
+    if (!entry) return null;
+    const alive = entry.proc.exitCode === null && entry.proc.killed === false;
+    return { agentName: entry.agentName, alive };
   }
 
   /** Phase 3: 为事件注入 _sender metadata */
@@ -118,6 +137,13 @@ export class AgentManager {
     }
     const proc = adapter.spawnExec(command, execOptions);
 
+    // Phase 5: 追踪 PM 进程（用于 suggestion 路由）
+    const isPm = mode === 'PM 拆解' && agentName === 'reasonix';
+    if (isPm) {
+      this.pmProcesses.set(sessionId, { agentName, proc });
+      console.log(`[PM] Registered PM process for session ${sessionId}`);
+    }
+
     // 解析 stdout
     let buf = '';
     const logStream = fs.createWriteStream(logPath, { flags: 'a' });
@@ -194,6 +220,16 @@ export class AgentManager {
       proc.on('close', (code) => {
         logStream.end();
         this.runningProcesses.delete(logId);
+        // Phase 5: 清理 PM 进程追踪
+        if (isPm) {
+          for (const [sid, entry] of this.pmProcesses) {
+            if (entry.proc === proc) {
+              this.pmProcesses.delete(sid);
+              console.log(`[PM] Unregistered PM process for session ${sid} (exit=${code})`);
+              break;
+            }
+          }
+        }
         this.sendToRenderer('agent:status', {
           agent: agentName,
           status: 'completed',

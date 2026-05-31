@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld('agent', {
   /** Phase 3: 获取 Agent 标签声明 */
   getManifest: (agentName: string) => ipcRenderer.invoke('agent:manifest', agentName),
 
+  /** Phase 5: 审批/拒绝 suggestion */
+  respondSuggestion: (sessionId: string, approved: boolean) =>
+    ipcRenderer.invoke('agent:suggestion:respond', sessionId, approved),
+
   /** Phase 6: Session 回放 */
   replay: (sessionId: string, projectId: string) => ipcRenderer.invoke('agent:replay', sessionId, projectId),
 

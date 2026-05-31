@@ -68,8 +68,29 @@ export function registerAgentHandlers(
       }
     }
 
-    // Phase 5: suggestion / task:update / task:add / task:cancel 转发到渲染进程（已在上面发送）
-    // 前端通过 onOutput 接收这些事件并处理
+    // Phase 5: suggestion 事件 — 按模式分发
+    if (event.event === 'suggestion') {
+      const ctx = activeContexts.get(agentName);
+      if (ctx) {
+        if (ctx.mode === 'YOLO') {
+          const sent = manager.writeToPm(ctx.sessionId, {
+            type: 'event', event: 'suggestion',
+            data: event.data, _sender: event._sender,
+          });
+          if (!sent) {
+            console.warn('[Suggestion] PM not available for YOLO, falling back to UI');
+            mainWindow.webContents.send('agent:output', {
+              agent: agentName, event, _meta: { mode: ctx.mode, paused: false }
+            });
+          }
+        } else {
+          const shouldPause = ctx.mode === '审批' || ctx.mode === '逐步';
+          mainWindow.webContents.send('agent:output', {
+            agent: agentName, event, _meta: { mode: ctx.mode, paused: shouldPause }
+          });
+        }
+      }
+    }
   });
 
   ipcMain.handle('agent:exec', async (_e, payload: {
@@ -129,5 +150,20 @@ export function registerAgentHandlers(
     }
 
     return allEvents.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  });
+
+  // Phase 5: 用户审批或拒绝 suggestion
+  ipcMain.handle('agent:suggestion:respond', async (_e, sessionId: string, approved: boolean) => {
+    if (approved) {
+      // 用户采纳 → 转发 suggestion 到 PM
+      manager.writeToPm(sessionId, { type: 'event', event: 'suggestion:approved', data: {} });
+    } else {
+      // 用户拒绝 → 通知 PM 忽略
+      manager.writeToPm(sessionId, { type: 'event', event: 'suggestion:rejected', data: {} });
+    }
+    // 通知前端恢复执行
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('agent:output', { _meta: { resume: true, sessionId } });
+    }
   });
 }
