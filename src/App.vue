@@ -37,8 +37,9 @@
       <div class="toolbar" v-if="currentProject">
         <div class="toolbar-item">
           <select v-model="selectedAgent" class="toolbar-select agent-select">
-            <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.label || a.name }}</option>
+            <option v-for="a in agents" :key="a.name" :value="a.name" :title="a.manifest?.tagline || ''">{{ a.label || a.name }}</option>
           </select>
+          <span v-if="selectedAgentManifest?.tagline" class="agent-tagline" :title="selectedAgentManifest.tagline">{{ selectedAgentManifest.tagline }}</span>
         </div>
         <div class="toolbar-item">
           <select v-model="selectedMode" class="toolbar-select mode-select">
@@ -66,6 +67,7 @@
           <div class="msg-role">
             <template v-if="m.role === 'agent'">
               <span class="agent-badge" :class="'agent-' + (m.agentName || selectedAgent || 'codewhale').toLowerCase()">{{ m.agentName || selectedAgent || 'CodeWhale' }}</span>
+              <span v-if="m.senderId" class="sender-id">{{ m.senderId }}</span>
             </template>
             <template v-else>{{ { user: '你', system: '系统' }[m.role] || m.role }}</template>
           </div>
@@ -124,7 +126,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 
 const agent = window.agent
 const db = window.db
@@ -162,6 +164,12 @@ watch(selectedMode, (newMode) => {
       selectedAgent.value = 'reasonix'
     }
   }
+})
+
+// Phase 3: 当前选中 Agent 的标签信息
+const selectedAgentManifest = computed(() => {
+  const a = agents.value.find(a => a.name === selectedAgent.value)
+  return a?.manifest || null
 })
 
 // ── 项目 ──
@@ -260,16 +268,22 @@ async function send() {
 
   let reply = ''
   let done = false
+  let senderId = ''
   const cleanup = agent.onOutput((data) => {
     // data = { agent, event } | { agent, raw }
     const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
+    // Phase 3: 捕获 _sender 身份标识
+    if (data?.event?._sender?.id) {
+      senderId = data.event._sender.id
+    }
     if (text) {
       reply += text
       const last = messages.value[messages.value.length - 1]
       if (last && last.role === 'agent') {
         last.content = reply
+        if (senderId) last.senderId = senderId
       } else {
-        messages.value.push({ id: 'tmp', role: 'agent', agentName: selectedAgent.value, content: reply, timestamp: Date.now() })
+        messages.value.push({ id: 'tmp', role: 'agent', agentName: selectedAgent.value, content: reply, senderId: senderId || undefined, timestamp: Date.now() })
       }
       scrollDown()
     }
@@ -370,13 +384,16 @@ async function summarizeMission() {
   // 调用 Reasonix PM 汇总任务执行结果
   let reply = ''
   let done = false
+  let senderId = ''
   const cleanup = agent.onOutput((data) => {
     const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
+    if (data?.event?._sender?.id) senderId = data.event._sender.id
     if (text) {
       reply += text
       const last = messages.value[messages.value.length - 1]
       if (last && last.role === 'agent') {
         last.content = reply
+        if (senderId) last.senderId = senderId
       } else {
         messages.value.push({ id: 'tmp', role: 'agent', agentName: 'reasonix', content: reply, timestamp: Date.now() })
       }
@@ -560,6 +577,12 @@ body {
 .agent-pm { background: #e65100; color: #ffe0b2; }
 .agent-ar-codewhale { background: #1b5e20; color: #a5d6a7; }
 .agent-ar-reasonix { background: #4a148c; color: #ce93d8; }
+
+/* Phase 3: _sender 实例 ID */
+.sender-id { font-size: 10px; color: #888; margin-left: 4px; font-family: monospace; }
+
+/* Phase 3: Agent 标签提示 */
+.agent-tagline { font-size: 11px; color: #888; margin-left: 8px; cursor: help; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── 增强任务显示 ── */
 .task-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }

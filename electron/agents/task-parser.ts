@@ -14,6 +14,12 @@ export interface TaskSpec {
   title: string;
   assignee?: string;
   description?: string;
+  /** Phase 4: 任务的上下文范围 — 用于下游增量读取 */
+  context?: {
+    scope?: string[];
+    baseline?: string;
+    deltas?: Array<{ file: string; type: string; diff?: string }>;
+  };
 }
 
 /**
@@ -115,6 +121,8 @@ function normalizeTask(t: any): TaskSpec {
     title: t.title || '',
     assignee: t.assignee || '',
     description: extra ? (description ? `${description}\n${extra}` : extra) : description,
+    // Phase 4: 保留上下文信息用于下游增量读取
+    context: t.context || undefined,
   };
 }
 

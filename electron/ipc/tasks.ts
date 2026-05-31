@@ -40,4 +40,30 @@ export function registerTaskHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('db:approvePlan', async (_e, sessionId: string) => {
     return repo.approveSessionPlan(sessionId);
   });
+
+  // Phase 6: 记忆系统
+  ipcMain.handle('db:saveMemory', async (_e, projectId: string, agentName: string, key: string, content: string, sessionId?: string) => {
+    return repo.saveMemory(projectId, agentName, key, content, sessionId);
+  });
+
+  ipcMain.handle('db:loadMemories', async (_e, projectId: string, agentName: string) => {
+    return repo.loadMemories(projectId, agentName);
+  });
+
+  ipcMain.handle('db:deleteMemory', async (_e, id: string) => {
+    return repo.deleteMemory(id);
+  });
+
+  // Phase 5: 动态任务调整
+  ipcMain.handle('db:updateTaskDescription', async (_e, id: string, description: string) => {
+    return repo.updateTask(id, { description });
+  });
+
+  ipcMain.handle('db:addTaskDynamic', async (_e, sessionId: string, projectId: string, title: string, assignee?: string) => {
+    return repo.addTask(sessionId, projectId, title);
+  });
+
+  ipcMain.handle('db:cancelTask', async (_e, id: string) => {
+    return repo.archiveTask(id);
+  });
 }

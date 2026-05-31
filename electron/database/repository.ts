@@ -332,3 +332,55 @@ export async function listAgentLogs(sessionId: string): Promise<AgentLog[]> {
   stmt.free();
   return results;
 }
+
+// ── 记忆 CRUD (Phase 6) ──
+
+export interface MemoryRecord {
+  id: string;
+  projectId: string;
+  sessionId: string | null;
+  agentName: string;
+  key: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function saveMemory(
+  projectId: string,
+  agentName: string,
+  key: string,
+  content: string,
+  sessionId?: string
+): Promise<MemoryRecord> {
+  const d = await db();
+  const ts = now();
+  const m: MemoryRecord = {
+    id: idgen(), projectId, sessionId: sessionId || null,
+    agentName, key, content, createdAt: ts, updatedAt: ts,
+  };
+  d.run(
+    'INSERT INTO memories (id, projectId, sessionId, agentName, key, content, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [m.id, m.projectId, m.sessionId, m.agentName, m.key, m.content, m.createdAt, m.updatedAt]
+  );
+  saveDatabase();
+  return m;
+}
+
+export async function loadMemories(projectId: string, agentName: string): Promise<MemoryRecord[]> {
+  const d = await db();
+  const stmt = d.prepare(
+    'SELECT * FROM memories WHERE projectId = ? AND agentName = ? ORDER BY updatedAt DESC'
+  );
+  stmt.bind([projectId, agentName]);
+  const results: MemoryRecord[] = [];
+  while (stmt.step()) results.push(stmt.getAsObject() as unknown as MemoryRecord);
+  stmt.free();
+  return results;
+}
+
+export async function deleteMemory(id: string): Promise<void> {
+  const d = await db();
+  d.run('DELETE FROM memories WHERE id = ?', [id]);
+  saveDatabase();
+}

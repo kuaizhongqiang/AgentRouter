@@ -76,6 +76,22 @@ ALTER TABLE tasks ADD COLUMN description TEXT NOT NULL DEFAULT '';
 ALTER TABLE tasks ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
 `;
 
+const SCHEMA_V4 = `
+-- Phase 6: 长期记忆系统
+CREATE TABLE IF NOT EXISTS memories (
+  id        TEXT PRIMARY KEY,
+  projectId TEXT NOT NULL,
+  sessionId TEXT,
+  agentName TEXT NOT NULL,
+  key       TEXT NOT NULL,
+  content   TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_memories_project_agent ON memories(projectId, agentName);
+`;
+
 /**
  * 运行所有迁移
  */
@@ -117,6 +133,7 @@ export function runMigrations(db: Database): void {
     { id: 1, name: 'v1-initial-schema', sql: SCHEMA_V1 },
     { id: 2, name: 'v2-agent-logs', sql: SCHEMA_V2 },
     { id: 3, name: 'v3-session-type-task-fields', sql: SCHEMA_V3 },
+    { id: 4, name: 'v4-memories', sql: SCHEMA_V4 },
   ];
 
   for (const m of migrations) {

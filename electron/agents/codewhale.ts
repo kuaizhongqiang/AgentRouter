@@ -7,7 +7,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import type { ChildProcess, SpawnOptions } from 'child_process';
-import type { AgentAdapter } from './adapter';
+import type { AgentAdapter, AgentExecOptions, AgentManifest } from './adapter';
 
 // 构建产物在 agents/codewhale/target/release/ 下
 // dist-electron/ 是编译输出目录，项目根在其上一级
@@ -19,6 +19,17 @@ const BINARY = path.join(
 export class CodeWhaleAdapter implements AgentAdapter {
   readonly name = 'codewhale';
   readonly displayName = 'CodeWhale';
+
+  manifest(): AgentManifest {
+    return {
+      identity: { id: 'ar-codewhale', label: 'CodeWhale', version: '0.8.46' },
+      tagline: 'DeepSeek 深度整合，推理型编码小能手',
+      best_for: ['代码生成与实现', '功能模块开发', '代码重构', '单元测试'],
+      not_for: ['长上下文综合分析', '安全审计'],
+      execution_model: { parallel_mode: 'multi-process', max_instances: 4 },
+      context_budget: { preferred_read_mode: 'incremental', context_window: '64K' },
+    };
+  }
 
   spawnExec(command: string, options?: SpawnOptions): ChildProcess {
     return spawn(BINARY, ['exec', '--auto', '--output-format', 'stream-json', '--platform-mode', command], {

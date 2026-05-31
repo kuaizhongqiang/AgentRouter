@@ -97,4 +97,9 @@ export function registerAgentHandlers(
   ipcMain.handle('agent:doctor', async (_e, agentName: string) => {
     return manager.doctor(agentName);
   });
+
+  // Phase 3: 获取 Agent 标签声明
+  ipcMain.handle('agent:manifest', async (_e, agentName: string) => {
+    return manager.getManifest(agentName);
+  });
 }

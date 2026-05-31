@@ -12,7 +12,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import type { BrowserWindow } from 'electron';
-import type { AgentAdapter, AgentEvent, AgentExecOptions } from './adapter';
+import type { AgentAdapter, AgentEvent, AgentExecOptions, SenderMetadata } from './adapter';
 import type { AgentLog } from '../types';
 
 export class AgentManager {
@@ -21,10 +21,31 @@ export class AgentManager {
   private mainWindow: BrowserWindow | null = null;
   private onEventCallback: ((agentName: string, event: AgentEvent) => void) | null = null;
 
+  /** Phase 3: 全局递增 sender 序列号，确保 id 唯一 */
+  private senderSeq = 0;
+
   constructor(mainWindow?: BrowserWindow) {
     if (mainWindow) {
       this.mainWindow = mainWindow;
     }
+  }
+
+  /** Phase 3: 获取指定 Agent 的标签声明 */
+  getManifest(agentName: string): import('./adapter').AgentManifest | null {
+    const adapter = this.adapters.get(agentName);
+    return adapter ? adapter.manifest() : null;
+  }
+
+  /** Phase 3: 为事件注入 _sender metadata */
+  private injectSender(event: AgentEvent, agentName: string): AgentEvent {
+    const adapter = this.adapters.get(agentName);
+    const label = adapter?.displayName || agentName;
+    this.senderSeq++;
+    const instanceId = `${agentName}-${this.senderSeq}`;
+    return {
+      ...event,
+      _sender: { label, id: instanceId },
+    };
   }
 
   /** 设置主窗口（延迟绑定） */
@@ -42,11 +63,12 @@ export class AgentManager {
     this.adapters.set(adapter.name, adapter);
   }
 
-  /** 列出所有已注册的 Agent */
-  list(): Array<{ name: string; label: string }> {
+  /** 列出所有已注册的 Agent（含 manifest） */
+  list(): Array<{ name: string; label: string; manifest: import('./adapter').AgentManifest }> {
     return Array.from(this.adapters.values()).map(a => ({
       name: a.name,
       label: a.displayName,
+      manifest: a.manifest(),
     }));
   }
 
@@ -124,13 +146,16 @@ export class AgentManager {
         }
 
         if (event) {
-          // 写入 .jsonl
-          logStream.write(JSON.stringify(event) + '\n');
+          // Phase 3: 注入 _sender metadata
+          const enriched = this.injectSender(event, agentName);
+
+          // 写入 .jsonl（带 _sender）
+          logStream.write(JSON.stringify(enriched) + '\n');
           // 转发给回调或直接发送到渲染进程
           if (this.onEventCallback) {
-            this.onEventCallback(agentName, event);
+            this.onEventCallback(agentName, enriched);
           } else {
-            this.sendToRenderer('agent:output', { agent: agentName, event });
+            this.sendToRenderer('agent:output', { agent: agentName, event: enriched });
           }
         } else {
           // 原始文本行 — 发送到渲染进程作为非结构化消息

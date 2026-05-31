@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld('agent', {
   /** 运行诊断 */
   doctor: (agentName: string) => ipcRenderer.invoke('agent:doctor', agentName),
 
+  /** Phase 3: 获取 Agent 标签声明 */
+  getManifest: (agentName: string) => ipcRenderer.invoke('agent:manifest', agentName),
+
   /**
    * 监听 Agent 输出事件
    * @returns 取消监听的函数
@@ -94,4 +97,18 @@ contextBridge.exposeInMainWorld('db', {
 
   // Agent 日志
   listAgentLogs: (sessionId: string) => ipcRenderer.invoke('db:listAgentLogs', sessionId),
+
+  // Phase 6: 记忆系统
+  saveMemory: (projectId: string, agentName: string, key: string, content: string, sessionId?: string) =>
+    ipcRenderer.invoke('db:saveMemory', projectId, agentName, key, content, sessionId),
+  loadMemories: (projectId: string, agentName: string) =>
+    ipcRenderer.invoke('db:loadMemories', projectId, agentName),
+  deleteMemory: (id: string) => ipcRenderer.invoke('db:deleteMemory', id),
+
+  // Phase 5: 动态任务调整
+  updateTaskDescription: (id: string, description: string) =>
+    ipcRenderer.invoke('db:updateTaskDescription', id, description),
+  addTaskDynamic: (sessionId: string, projectId: string, title: string, assignee?: string) =>
+    ipcRenderer.invoke('db:addTaskDynamic', sessionId, projectId, title, assignee),
+  cancelTask: (id: string) => ipcRenderer.invoke('db:cancelTask', id),
 });
