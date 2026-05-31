@@ -1,6 +1,6 @@
 # AgentRouter — 通信协议
 
-> **整合：消息头 Metadata · 事件协议 · 上下文传递机制**
+> **整合：消息头 Metadata · 事件协议 · 上下文传递机制 · 动态调整**
 
 ---
 
@@ -31,8 +31,6 @@ Sender (untrusted metadata):
 | **调度决策** | PM 看到 CodeWhale 干完了，知道下一步该谁上 |
 
 ### 消息头扩展字段
-
-根据场景，metadata 可携带扩展信息：
 
 #### 带执行模型标记
 
@@ -112,7 +110,7 @@ CLI → 平台: stdout（JSON Lines 事件流）
 | `data` | ✅ | 事件负载 |
 | `timestamp` | ✅ | ISO 8601 时间戳 |
 
-### 第一阶段事件
+### 执行事件
 
 | 事件 | 含义 | data |
 |---|---|---|
@@ -122,11 +120,22 @@ CLI → 平台: stdout（JSON Lines 事件流）
 | `error` | 出错 | `{"message":"文件不存在"}` |
 | `cancelled` | 取消 | `{"reason":"用户终止"}` |
 
+### 动态调整事件
+
+Agent 执行中发现需要配合、或需要调整任务计划时使用。
+
+| 事件 | 发送者 | 含义 | data |
+|---|---|---|---|
+| `suggestion` | 执行中的 Agent | 向 PM 提建议 | `{"target_agent":"...","target_task":"...","suggestion":"...","reason":"..."}` |
+| `task:update` | PM | 任务被修改 | `{"task_id":"t2","changes":{...},"reason":"根据A的建议调整"}` |
+| `task:add` | PM | 追加新任务 | `{"task":{...},"reason":"执行中发现新需求"}` |
+| `task:cancel` | PM | 取消任务 | `{"task_id":"t2","reason":"已不需要"}` |
+
 ---
 
-## 消息流中的上下文传递
+## 消息流示例
 
-### 完整消息链
+### 静态消息链（一次拆解，一次执行）
 
 ```
 平台收到消息流：
@@ -167,6 +176,78 @@ CLI → 平台: stdout（JSON Lines 事件流）
 ```
 
 **关键：审查时不需要重读全量，因为 metadata.context 携带了上游的增量信息。**
+
+### 动态消息链（执行中调整）
+
+任务不是一次拆完就固定了。Agent 执行中可向 PM 提建议，PM 动态调整任务。
+
+```
+平台收到消息流：
+┌─────────────────────────────────────────────────────┐
+│ #1 PM 初始拆解                                       │
+│ _sender: { label: "Reasonix-PM", id: "pm-001" }     │
+│ event: completion                                    │
+│ data: {                                             │
+│   tasks: [                                          │
+│     { id:"t1", title:"修改 alpha 脚本", assignee:"codewhale" },
+│     { id:"t2", title:"新增 beta 脚本",   assignee:"codewhale" }
+│   ],                                                │
+│   parallel_groups: [["t1","t2"]]                    │
+│ }                                                    │
+├─────────────────────────────────────────────────────┤
+│ #2 CodeWhale 执行 t1，发现需要配合                     │
+│ _sender: { label: "CodeWhale", id: "cw-001",        │
+│           context: { scope: ["src/alpha/"], ... } }   │
+│ event: suggestion                                     │
+│ data: {                                               │
+│   target_agent: "codewhale",                          │
+│   target_task: "t2",                                  │
+│   suggestion: "建议在 beta 中增加配置加载模块",         │
+│   reason: "alpha 当前写死了配置参数，如果 beta 抽离     │
+│            配置层，后续维护更方便"                      │
+│ }                                                    │
+├─────────────────────────────────────────────────────┤
+│ #3 PM 评估建议 → 动态调整                              │
+│ _sender: { label: "Reasonix-PM", id: "pm-001" }     │
+│ event: task:update                                    │
+│ data: {                                               │
+│   task_id: "t2",                                      │
+│   changes: {                                          │
+│     description: "新增 beta 脚本 + 配置加载模块"        │
+│   },                                                  │
+│   reason: "采纳 A 的建议，让 beta 同时实现配置层"       │
+│ }                                                    │
+├─────────────────────────────────────────────────────┤
+│ #4 调度器通知 B 任务已更新                              │
+│ B 启动时读取最新任务描述 → 按调整后的方案执行            │
+└─────────────────────────────────────────────────────┘
+```
+
+**原则：PM 是唯一决策者，Agent 只能提建议，不能直接改任务。**
+
+### 调整时序判断
+
+PM 收到 suggestion 时，根据 B 的当前状态做决策：
+
+| B 的状态 | PM 决策 |
+|---|---|
+| 还没开始 | 直接修改 t2 的任务描述 |
+| 已开始，不冲突 | 追加补充任务 t2b，等 t2 完成后执行 |
+| 已开始，冲突 | 标记冲突，等 B 完成后人工介入 |
+| 已完成 | 追加新任务，或忽略建议 |
+
+### PM 生命周期
+
+PM 进程可能已经退出，平台需要处理：
+
+```
+平台收到 suggestion
+  → 检查 PM 进程状态
+  ├── PM 进程还在 → 转发 suggestion
+  └── PM 已退出 → spawn 新 PM 进程
+                   → 注入当前执行上下文（已完成任务、进行中任务）
+                   → PM 评估建议 → 产出调整
+```
 
 ---
 
