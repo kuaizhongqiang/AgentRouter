@@ -16,12 +16,17 @@ set "VER=%VER:,=%"
 echo Version: %VER%
 echo.
 
-REM Use project-local build cache (bundled with repo)
-set "ELECTRON_BUILDER_CACHE=%CD%\build-cache"
-if exist "%ELECTRON_BUILDER_CACHE%\nsis" (
-  echo Cache: local (build-cache/)
+REM Seed system electron-builder cache with project-local tools
+set "LOCAL_CACHE=%CD%\build-cache"
+set "SYS_CACHE=%LOCALAPPDATA%\electron-builder\Cache"
+if exist "%LOCAL_CACHE%\winCodeSign" (
+  echo Seeding build cache...
+  if not exist "%SYS_CACHE%\winCodeSign" mkdir "%SYS_CACHE%\winCodeSign" 2>nul
+  xcopy "%LOCAL_CACHE%\winCodeSign\*" "%SYS_CACHE%\winCodeSign\" /e /i /y /q >nul 2>nul
+  xcopy "%LOCAL_CACHE%\nsis\*" "%SYS_CACHE%\nsis\" /e /i /y /q >nul 2>nul
+  echo Cache ready
 ) else (
-  echo Cache: system (will download dependencies on first run)
+  echo Cache: system will download on first build
 )
 echo.
 
