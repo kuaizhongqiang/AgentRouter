@@ -9,7 +9,7 @@ echo ========================================
 echo.
 
 REM Read version from package.json
-for /f "usebackq tokens=2 delims=:," %%a in (`type package.json ^| findstr /C:version`) do set "VER=%%~a"
+for /f "tokens=2 delims=:," %%a in ('type package.json ^| findstr /C:\"version\" ^| findstr /v artifactName') do set "VER=%%~a"
 set "VER=%VER:"=%"
 set "VER=%VER: =%"
 set "VER=%VER:,=%"
