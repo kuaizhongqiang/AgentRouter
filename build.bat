@@ -55,10 +55,12 @@ echo.
 REM Step 3: Package as unpacked app
 echo [3/4] Packaging app...
 
+set "OUTDIR=release\AgentRouter-%VER%"
 if exist "build-out" rmdir /s /q "build-out" 2>nul
-if exist "release" rmdir /s /q "release" 2>nul || echo Note: release\ locked, ok
+if exist "release" rmdir /s /q "release" 2>nul || echo Note: release\ locked
+if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 
-call npx electron-builder --win --dir -c.directories.output=build-out
+call npx electron-builder --win --dir -c.directories.output=%OUTDIR%
 if %errorlevel% neq 0 (
   echo FAILED: electron-builder
   pause
@@ -67,17 +69,17 @@ if %errorlevel% neq 0 (
 echo OK
 echo.
 
-REM Step 4: Organize output into versioned directory
-echo [4/4] Organizing output...
-set "OUTDIR=release\AgentRouter-%VER%"
-if not exist "%OUTDIR%" mkdir "%OUTDIR%"
-
-if exist "build-out\win-unpacked\AgentRouter.exe" (
-  move "build-out\win-unpacked" "%OUTDIR%\" >nul
-  echo App: %OUTDIR%\win-unpacked\AgentRouter.exe
-  echo (double-click to run, no installation needed)
+REM If electron-builder put output elsewhere, find and copy it
+if not exist "%OUTDIR%\win-unpacked\AgentRouter.exe" (
+  if exist "build-out\win-unpacked\AgentRouter.exe" (
+    xcopy "build-out\win-unpacked" "%OUTDIR%\" /e /i /y /q >nul
+  )
+  if exist "release\win-unpacked\AgentRouter.exe" (
+    xcopy "release\win-unpacked" "%OUTDIR%\" /e /i /y /q >nul
+  )
 )
-echo OK
+
+echo App: %OUTDIR%\win-unpacked\AgentRouter.exe
 echo.
 
 echo ========================================
