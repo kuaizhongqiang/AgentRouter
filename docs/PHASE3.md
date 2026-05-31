@@ -602,6 +602,14 @@ PM 发出调整事件，平台 UI 即时响应：
 
 ---
 
+## 后续规划（已识别，未排期）
+
+| 事项 | 说明 |
+|---|---|
+| **Markdown 渲染** | Agent 输出为 Markdown 格式（代码块、表格、列表等），当前 App.vue 以纯文本 `{{ m.content }}` 直接显示。需引入 marked / markdown-it 等渲染器，支持代码高亮。 |
+| **图表渲染（Mermaid）** | Agent 输出中可能包含 Mermaid 结构图（流程图、时序图、类图等），需引入 mermaid.js 渲染器，在对话中实时渲染为可视化图表。 |
+| **前端组件化** | 将 App.vue 拆分为独立组件（MessageList, TaskPanel, AgentSelector 等），当前为单文件 SFC。 |
+
 ## 参考
 
 - [ProjectVision/CONCEPT.md](../ProjectVision/CONCEPT.md) — 核心概念
