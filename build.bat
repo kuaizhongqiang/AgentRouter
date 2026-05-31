@@ -52,33 +52,15 @@ if %errorlevel% neq 0 (
 echo OK
 echo.
 
-REM Step 3: Package as portable exe
-echo [3/4] Packaging as Windows portable exe...
+REM Step 3: Package as unpacked app
+echo [3/4] Packaging app...
 
-REM Clean up previous build output (handle locked files)
-if exist "release" (
-  rmdir /s /q "release" 2>nul || (
-    echo Note: release\ is locked, using build-out\ instead
-  )
-)
 if exist "build-out" rmdir /s /q "build-out" 2>nul
+if exist "release" rmdir /s /q "release" 2>nul || echo Note: release\ locked, ok
 
-if exist "release" (
-  call npx electron-builder --win portable -c.directories.output=build-out
-) else (
-  call npx electron-builder --win portable
-)
-
+call npx electron-builder --win --dir -c.directories.output=build-out
 if %errorlevel% neq 0 (
-  echo FAILED: electron-builder packaging
-  echo.
-  if exist "build-out\win-unpacked\AgentRouter.exe" (
-    echo Unpacked: build-out\win-unpacked\AgentRouter.exe
-  )
-  if exist "release\win-unpacked\AgentRouter.exe" (
-    echo Unpacked: release\win-unpacked\AgentRouter.exe
-  )
-  echo.
+  echo FAILED: electron-builder
   pause
   exit /b 1
 )
@@ -90,21 +72,10 @@ echo [4/4] Organizing output...
 set "OUTDIR=release\AgentRouter-%VER%"
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 
-if exist "build-out\AgentRouter-%VER%.exe" (
-  move "build-out\AgentRouter-%VER%.exe" "%OUTDIR%\" >nul
-  echo Portable: %OUTDIR%\AgentRouter-%VER%.exe
-)
 if exist "build-out\win-unpacked\AgentRouter.exe" (
   move "build-out\win-unpacked" "%OUTDIR%\" >nul
-  echo Unpacked: %OUTDIR%\win-unpacked\AgentRouter.exe
-)
-if exist "release\AgentRouter-%VER%.exe" (
-  move "release\AgentRouter-%VER%.exe" "%OUTDIR%\" >nul
-  echo Portable: %OUTDIR%\AgentRouter-%VER%.exe
-)
-if exist "release\win-unpacked\AgentRouter.exe" (
-  move "release\win-unpacked" "%OUTDIR%\" >nul
-  echo Unpacked: %OUTDIR%\win-unpacked\AgentRouter.exe
+  echo App: %OUTDIR%\win-unpacked\AgentRouter.exe
+  echo (double-click to run, no installation needed)
 )
 echo OK
 echo.
