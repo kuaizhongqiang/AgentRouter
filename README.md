@@ -17,35 +17,42 @@ AgentRouter/
 │   │   ├── projects.ts        项目 CRUD
 │   │   ├── sessions.ts        对话 CRUD
 │   │   ├── messages.ts        消息 CRUD
-│   │   ├── tasks.ts           任务 CRUD
-│   │   └── agents.ts          Agent 执行 IPC
+│   │   ├── tasks.ts           任务 CRUD + 记忆 + 动态调整
+│   │   └── agents.ts          Agent 执行 IPC + suggestion 路由
 │   ├── database/              数据层
 │   │   ├── index.ts            SQLite 初始化 (sql.js)
-│   │   ├── migrations.ts       Schema 迁移
-│   │   └── repository.ts       CRUD 操作
-│   └── agents/                Agent 管理层
-│       ├── adapter.ts          AgentAdapter 接口
-│       ├── manager.ts          AgentManager (多 Agent 调度)
-│       ├── task-parser.ts      任务块解析器（PM 拆解）
-│       ├── codewhale.ts        CodeWhale 适配器
-│       └── reasonix.ts         Reasonix 适配器
+│   │   ├── migrations.ts       Schema 迁移 (v1-v4)
+│   │   └── repository.ts       CRUD 操作 + 记忆系统
+│   ├── agents/                Agent 管理层
+│   │   ├── adapter.ts          AgentAdapter 接口 (+ SenderMetadata/AgentManifest)
+│   │   ├── manager.ts          AgentManager (+ _sender 注入 + PM 生命周期)
+│   │   ├── task-parser.ts      任务块解析器（PM 拆解 + context）
+│   │   ├── codewhale.ts        CodeWhale 适配器 (+ manifest)
+│   │   └── reasonix.ts         Reasonix 适配器 (+ manifest)
+│   ├── scheduler/              调度引擎 (Phase 4-5)
+│   │   ├── executor.ts         并行执行 + 冲突检测 + 信号量
+│   │   └── pm-lifecycle.ts     PM 生命周期 + suggestion 路由
+│   └── mcp/                    MCP 服务器 (Phase 6)
+│       └── server.ts           文件工具 (read/write/search)
 ├── src/                       Vue 3 前端
-│   └── App.vue                三栏 UI + Agent/模式选择器
+│   └── App.vue                三栏 UI + Agent 标签 + mode 选择 + 推理气泡
+├── ProjectVision/              愿景文档体系（参阅基准）
+├── docs/                      设计文档 & 报告
+│   ├── GOALS.md                核心目标
+│   ├── ARCHITECTURE.md         架构决策（已由 ProjectVision 取代）
+│   ├── PROTOCOL.md             CLI↔平台通信协议
+│   ├── PHASE1.md               第一期实施范围（已归档）
+│   ├── PHASE2.md               第二期实施范围（已归档）
+│   ├── PHASE3.md               第三期及后续规划（基于 ProjectVision）
+│   ├── SCENARIO.md             全流程场景推演
+│   ├── AUDIT_REPORT.md         审计报告（96% 对齐）
+│   └── TEST_REPORT.md          测试报告（100/100 PASS）
+├── test/                       运行时测试
+│   ├── smoke-test.mjs          端到端冒烟测试
+│   └── runtime-test-2.mjs      Phase 3-6 运行时集成测试（100 项）
 ├── agents/                    Fork 的开源 CLI 源码
 │   ├── reasonix/              DeepSeek-Reasonix (MIT, v0.52.0)
 │   └── codewhale/             CodeWhale (MIT, v0.8.46)
-├── docs/                      设计文档
-│   ├── GOALS.md                核心目标
-│   ├── ARCHITECTURE.md         架构决策
-│   ├── PROTOCOL.md             CLI↔平台通信协议
-│   ├── PHASE1.md               第一期实施范围
-│   ├── PHASE2.md               第二期实施范围
-│   ├── PHASE3.md               第三期规划
-│   ├── SCENARIO.md             全流程场景推演
-│   ├── CLI_MODIFICATION.md     CLI 改造方案
-│   ├── FORK_MANAGEMENT.md      Fork 管理与署名
-│   ├── OUTPUT_MANAGEMENT.md    产出文件管理
-│   └── AGENT_ADAPTATION_GUIDE.md Agent 改造方法论
 └── package.json
 ```
 
@@ -58,15 +65,20 @@ AgentRouter/
 | **项目管理** | ✅ | 绑定本地路径，多仓库 |
 | **对话/消息** | ✅ | 多标签页，SQLite 持久化 |
 | **单 Agent 执行** | ✅ | 默认 CodeWhale，支持 Reasonix |
-| **Agent 选择器** | ✅ | Web 端 + 后端多 Agent 路由 |
-| **PM 任务拆解** | ✅ (Phase 2) | Reasonix 担任 PM，产出结构化任务列表 |
-| **多 Agent 并行** | ✅ (Phase 2) | 按 parallel_groups 调度，并发执行 |
-| **审批/汇总** | ✅ (Phase 2) | 审批 Plan + Mission 汇总验收 |
-| **Reasonix 集成** | ✅ | 新增 `platform` 子命令 + `--role pm` |
-| **CodeWhale 集成** | ✅ | 新增 `--platform-mode` 参数 |
-| **执行模式** | 🚧 Phase 3 | YOLO / 审批 / 逐步 / 预览 |
-| **推理气泡** | 🚧 Phase 3 | 实时显示 Agent 推理过程 |
-| **长期记忆** | 🚧 Phase 3 | 跨会话 Agent 记忆持久化 |
+| **Agent 选择器 + 标签** | ✅ Phase 3 | 下拉选择 + tagline 工具提示 |
+| **`_sender` 消息身份** | ✅ Phase 3 | 每条事件带 `{label, id}` 标识 |
+| **PM 任务拆解** | ✅ Phase 2 | Reasonix 担任 PM，产出结构化任务列表 |
+| **并行执行 + 冲突检测** | ✅ Phase 4 | parallel_groups 分组 + Semaphore 并发 + 文件冲突降级串行 |
+| **审批/汇总** | ✅ Phase 2 | 审批 Plan + Mission 汇总验收 |
+| **执行模式** | ✅ Phase 4 | YOLO / 审批 / 逐步 / 预览 |
+| **动态调整 (suggestion)** | ✅ Phase 5 | Agent 提建议 → 模式驱动分发（YOLO 自动/审批暂停）|
+| **PM 生命周期** | ✅ Phase 5 | PM 进程追踪 + stdin suggestion 转发 |
+| **推理气泡** | ✅ Phase 6 | Reasonix reasoningDelta → 前端紫色气泡实时显示 |
+| **长期记忆系统** | ✅ Phase 6 | memories 表 + CRUD IPC + preload 全链路 |
+| **Session 回放** | ✅ Phase 6 | 读取 .jsonl 事件文件按时间戳回放 |
+| **MCP 工具注入** | ✅ Phase 6 | 自动启动 MCP Server（file.read/write/search）|
+| **Reasonix 集成** | ✅ | `platform` 子命令 + `--role pm` |
+| **CodeWhale 集成** | ✅ | `--platform-mode` 参数 |
 
 ---
 
@@ -78,23 +90,37 @@ AgentRouter/
 用户选择 Agent → 输入任务 → Agent 执行 → 结果返回对话
 ```
 
-### PM 拆解模式（Phase 2）
+### PM 拆解模式（完整链路）
 
 ```
 用户选择 PM 拆解 → 自动切 Reasonix
                   │
                   ▼
         Reasonix(PM) 分析需求 → 产出结构化任务列表
-                      {tasks: [{id, title, assignee, path, depends_on, parallel_group}]}
+           带 context(scope/deltas) + _sender 身份标识
                   │
                   ▼
-        用户审批 Plan → 平台按 parallel_groups 并发调度
-                        t1 → codewhale (Group 1)
-                        t2 → codewhale (Group 2, 并行)
-                        t3 → reasonix (Group 2, 并行)
+        按执行模式分发：
+          YOLO 🚀     → 自动审批 + 并行执行
+          审批 ✅     → 展示任务列表 → 用户确认 → 执行
+          逐步 👣     → 每组开始前确认
+          预览 👀     → 只看计划不执行
                   │
                   ▼
-        任务完成 → 用户点"汇总 Mission" → PM 验收总结
+        执行中动态调整（suggestion）：
+          YOLO → Agent→PM 自动协商 → task:update
+          审批 → UI 暂停 → 用户采纳/拒绝 → 恢复
+                  │
+                  ▼
+        任务完成 → 汇总 Mission → PM 验收总结
+```
+
+### 消息流
+
+```
+每条消息带 _sender: { label, id }   ← Phase 3
+推理过程实时显示为紫色气泡           ← Phase 6
+Agent 可在执行中提建议               ← Phase 5
 ```
 
 ---
@@ -131,9 +157,11 @@ npm run build
 
 ## 数据存储
 
-`~/.agentrouter/agentrouter.db` — SQLite 数据库 (sql.js WASM 引擎)
+`~/.agentrouter/agentrouter.db` — SQLite 数据库 (sql.js WASM 引擎)，包含 `projects`、`sessions`、`messages`、`tasks`、`agent_logs`、`memories` 表。
 
 Agent 执行日志输出到 `~/.agentrouter/projects/<id>/sessions/<id>/events/`（JSON Lines 格式）
+
+Agent 记忆存储在同目录的 `memories` 表中，按项目+Agent 名索引。
 
 ---
 
