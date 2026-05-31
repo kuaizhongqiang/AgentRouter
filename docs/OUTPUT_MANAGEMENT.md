@@ -1,5 +1,10 @@
 # AgentRouter — Agent 产出文件管理
 
+> **文档状态**: 已更新 ✅ — 新增上下文传递参考。
+> 
+> **Phase 4 扩展**: Agent 产出将通过 `metadata.context.deltas` 在 Agent 之间传递上下文。下游 Agent 只读增量，不读全量。
+> 详见 [ProjectVision/PROTOCOL.md](../ProjectVision/PROTOCOL.md) 上下文传递章节。
+
 > 所有 Agent 在本地产生的日志、事件、产物统一归平台管理。
 > Agent 内部怎么生成、生成什么格式，我们不动。
 

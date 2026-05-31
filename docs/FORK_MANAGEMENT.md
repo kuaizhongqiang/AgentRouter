@@ -1,5 +1,7 @@
 # AgentRouter — Fork 管理与署名
 
+> **文档状态**: 已归档 🗄️ — Phase 1-2 的 Fork 管理记录。Agent 接入信息请参考 [ProjectVision/ARCHITECTURE.md](../ProjectVision/ARCHITECTURE.md) 标签系统。
+
 > agents/ 目录下的 CLI 都是开源项目的 fork，需要规范化管理。
 
 ---

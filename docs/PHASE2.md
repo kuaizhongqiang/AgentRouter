@@ -1,5 +1,8 @@
 # AgentRouter — 第二期范围
 
+> **文档状态**: 已归档 🗄️ — Phase 2 已于 2026-05-31 完成。后续规划请参考 [PHASE3.md](PHASE3.md)（基于 ProjectVision 重编）。
+> 完整愿景详见 [ProjectVision/](../ProjectVision/)。
+
 > 第二期目标：实现 Mission 驱动的多 Agent 协同闭环。用户与 PM 对话产出 Mission，PM 拆解为 Task 后多 Agent 并行执行，全程用户可审批和干预。
 
 ---

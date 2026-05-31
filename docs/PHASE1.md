@@ -1,5 +1,8 @@
 # AgentRouter — 第一期范围
 
+> **文档状态**: 已归档 🗄️ — Phase 1 已于 2026-05-30 完成。后续规划请参考 [PHASE3.md](PHASE3.md)（基于 ProjectVision 重编）。
+> 完整愿景详见 [ProjectVision/](../ProjectVision/)。
+
 > 第一期目标：搭建平台底座，让"PM 拆任务 → 多 Agent 执行"的闭环能跑通。
 
 ---

@@ -8,6 +8,9 @@
 > **文档状态: 历史归档** — 本审计报告编写于 Phase 1 改造之前（2026-05-30）。
 > Phase 1 完成后约 90% 的代码级问题已被修复。保留此文档作为历史参考，
 > 不应视为当前代码状态的准确描述。
+>
+> **2026-05-31 更新**: ProjectVision/ 文档体系已创建（CONCEPT/ARCHITECTURE/PROTOCOL/PERSONA/SCENARIO）。
+> 后续架构和协议设计以 ProjectVision/ 为准，本审计报告不再更新。
 
 ---
 

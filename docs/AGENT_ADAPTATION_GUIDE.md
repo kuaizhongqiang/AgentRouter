@@ -1,5 +1,9 @@
 # AgentRouter — Agent 改造方法论
 
+> **文档状态**: 已更新 ✅ — 新增 Agent 标签系统参考。完整协议定义请见 [ProjectVision/PROTOCOL.md](../ProjectVision/PROTOCOL.md)。
+> 
+> **新增要求**: 每个 Agent 接入时需声明标签（identity/best_for/execution_model/context_budget），详见 [ProjectVision/ARCHITECTURE.md](../ProjectVision/ARCHITECTURE.md) 标签系统章节。
+
 > 规范化的流程：把任意一个开源 coding CLI 改造成兼容 AgentRouter 平台的 Agent。
 
 ---

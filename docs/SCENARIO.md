@@ -4,17 +4,26 @@
 
 > **功能状态**
 > 
-> | 功能 | 状态 |
-> |---|---|
-> | 项目绑定 | ✅ 已实现 |
-> | Agent 选择器 + 模式选择器 | ✅ 已实现 |
-> | PM 拆解任务并输出结构化任务列表 | ✅ Phase 2 已完成 |
-> | 任务审批模式（审批 Plan 按钮） | ✅ Phase 2 已完成 |
-> | PM 验收汇总（汇总 Mission 按钮） | ✅ Phase 2 已完成 |
-> | YOLO / 逐步 / 预览模式 | ⬜ 待实现 (Phase 3) |
-> | parallel_groups 并行调度 | ⬜ Phase 2+ |
-> | 任务依赖图 DAG 可视化 | ⬜ 规划中 |
-> | 推理气泡 | ⬜ Phase 3 |
+> | 功能 | 状态 | 对应阶段 |
+> |---|---|---|
+> | 项目绑定 | ✅ 已实现 | Phase 1 |
+> | Agent 选择器 + 模式选择器 | ✅ 已实现 | Phase 1-2 |
+> | PM 拆解任务并输出结构化任务列表 | ✅ 已实现 | Phase 2 |
+> | 任务审批 + 汇总验收 | ✅ 已实现 | Phase 2 |
+> | `_sender` metadata | ⬜ 待实现 | Phase 3 |
+> | Agent 标签注册（best_for / max_instances） | ⬜ 待实现 | Phase 3 |
+> | parallel_groups 并行调度 | ⬜ 待实现 | Phase 4 |
+> | 上下文传递（scope + baseline + deltas） | ⬜ 待实现 | Phase 4 |
+> | YOLO / 逐步 / 预览模式 | ⬜ 待实现 | Phase 4 |
+> | 文件冲突检测 | ⬜ 待实现 | Phase 4 |
+> | 执行中动态调整（suggestion 机制） | ⬜ 待实现 | Phase 5 |
+> | PM 生命周期管理 | ⬜ 待实现 | Phase 5 |
+> | 推理气泡 | ⬜ 待实现 | Phase 6 |
+> | 长期记忆系统 | ⬜ 待实现 | Phase 6 |
+> | Session 回放 | ⬜ 待实现 | Phase 6 |
+> | MCP 工具注入 | ⬜ 待实现 | Phase 6 |
+> 
+> **完整场景推演参考**: [ProjectVision/SCENARIO.md](../ProjectVision/SCENARIO.md) — 含动态调整的 9 步全流程。
 
 ---
 

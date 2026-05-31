@@ -1,132 +1,238 @@
-# AgentRouter — 第三期范围
+# AgentRouter — 第三期及后续规划
 
-> 第三期目标：提升平台交互体验与持久化能力。包括推理过程可视化、长期记忆系统、Session 回放等。
+> 本规划基于 [ProjectVision](../ProjectVision/) 愿景文档体系重新编排。
+> 原有 PHASE3.md（推理气泡/记忆/回放/MCP）已合并入对应阶段。
 
 ---
 
-## 需求清单
+## 概述
 
-### R0: PM 拆解模式 Agent 强制绑定 (Prerequisite)
-
-**优先级**: P0 — 已修复 (2026-05-31)
-
-**现状**: 用户在"PM 拆解"模式下仍可手动选择 CodeWhale 等不支持 PM 角色的 Agent，导致 Agent 错误地将需求当作编码任务处理，而非进行任务拆解。CodeWhale 适配器的 `spawnExec` 类型为 `SpawnOptions`，不识别 `mode` 参数。
-
-**修复**: App.vue 添加 `watch(selectedMode)`，当切换到"PM 拆解"时自动将 `selectedAgent` 设为 `reasonix`。
-
-**原则**: PM 拆解 → Reasonix（唯一 PM 角色实现）；对话 → 用户自由选择。
-
-### R1: 推理气泡 (Reasoning Bubble)
-
-**优先级**: P0
-
-**现状**: Reasonix (DeepSeek) 在生成回复前有内部推理（reasoning）阶段，但当前 `platform-output.ts` 的 `loopEventToPlatform()` 只转发 `assistant_delta` 的可见 `content`，忽略了 `LoopEvent.reasoningDelta`。用户在前端看不到任何"思考中"的指示，输出感觉断断续续。
-
-**技术桥接点**:
-- Reasonix 侧：`src/loop/types.ts` 中 `LoopEvent` 已有 `reasoningDelta?: string` 字段
-- Reasonix 侧：`src/core/eventize.ts` 中已将 reasoning 作为独立事件处理
-- Reasonix 侧：`src/cli/platform-output.ts` 的 `loopEventToPlatform()` 需新增处理 `ev.reasoningDelta`，输出带 channel 标记的 progress 事件
-- 平台侧：`electron/ipc/agents.ts` 收到带 `channel: "reasoning"` 的 progress 事件后，转发到渲染进程
-- 前端侧：App.vue 消息区需新增"推理气泡"UI 组件：
-  - 在 agent 消息气泡上方或内部，显示灰/蓝色的推理过程
-  - 推理气泡在 agent 开始推理时出现，推理结束时收起或保留
-  - 支持实时流式更新（逐 token 追加）
-
-**事件协议扩展**:
+Phase 1-2 完成了平台底座跑通。Phase 3-6 的目标是将 AgentRouter 从"能用的 MVP"演进为"产品级的调度中心"，完全对齐 ProjectVision 定义的概念模型。
 
 ```
-// Reasonix → 平台 (stdout NDJSON)
-{"event":"progress","data":{"message":"...","channel":"reasoning"}}
-
-// 平台 → 渲染进程 (IPC)
-{agent:"reasonix",event:{event:"progress",data:{message:"...",channel:"reasoning"}}}
+ProjectVision 定义                          代码实现过程
+╔══════════════════════════╗         ┌──────────────────────────┐
+║  CONCEPT.md              ║         │ Phase 3: 协议基础 + 标签   │
+║  概念模型 + 核心机制      ║  ──→   │ Phase 4: 调度智能          │
+║  ARCHITECTURE.md         ║         │ Phase 5: 动态调整          │
+║  架构设计 + 协同模型      ║  ──→   │ Phase 6: 高级协议           │
+║  PROTOCOL.md             ║         └──────────────────────────┘
+║  通信协议 + Metadata      ║  ──→   (按阶段逐步对 Protocol 落地)
+║  SCENARIO.md             ║
+║  全流程场景推演           ║  ──→   终极目标：跑通 Step 1-9 完整链路
+╚══════════════════════════╝
 ```
 
-**验收标准**:
-- 用户发送消息后，立即出现"正在思考..."气泡
-- 推理 token 逐字流式显示在气泡中
-- 推理结束时，气泡保留或淡化为历史记录
-- 可见内容开始输出后，推理气泡与内容气泡区分显示
-
 ---
 
-### R2: 长期记忆系统 (Long-term Memory)
+## Phase 3：协议基础 + Agent 标签注册
 
-**优先级**: P1
+> **目标**：建立通信协议的基础设施，让每条消息有身份，每个 Agent 有标签。
 
-**来源**: GOALS.md / PHASE2.md deferred
+### 3.1 `_sender` Metadata 注入
 
-**描述**:
-- 每个 Agent 维护自己的项目级持久化记忆
-- 记忆写入 `.agentrouter/projects/{projectId}/memory/` 目录
-- 记忆生命周期：创建 → 更新 → 过期/归档
-- 支持记忆检索：Agent 启动时自动加载相关记忆作为 system prompt 前缀
+**现状**：当前平台事件没有 `_sender` 字段。AgentManager 转发事件时知道 agentName，但未包装为标准化 metadata。
 
-**技术要点**:
-- 数据库 `memories` 表（sessionId, projectId, agentName, content, key, createdAt, updatedAt）
-- 记忆存取 IPC 通道：`db:saveMemory` / `db:loadMemories`
-- 记忆注入：Agent 执行时通过 `--memory` 参数或环境变量注入
-- 记忆压缩/蒸馏：当记忆过多时自动摘要
+**改动范围**：
 
----
-
-### R3: Session 回放 (Session Replay)
-
-**优先级**: P1
-
-**来源**: PHASE2.md deferred
-
-**描述**:
-- 允许用户回放任意历史会话的事件流
-- 前端以原始速度或加速模式重放消息
-- 支持"跳到检查点"功能（会话关键节点快照）
-
-**技术要点**:
-- 事件存储：`events/` 目录下的 `.jsonl` 文件已包含完整事件流
-- 回放 IPC 通道：`agent:replay`
-- 前端回放控件：播放/暂停/速度控制/进度条
-
----
-
-### R4: 工具注入 (MCP 集成)
-
-**优先级**: P1
-
-**现状**: Reasonix `platform` 模式当前无内置文件系统工具；CodeWhale 自带文件读写能力。
-
-**描述**: 平台通过 MCP 协议向 Agent 注入文件系统、代码搜索等工具，使 Reasonix 在 platform 模式下具备实际环境交互能力。
-
-**技术要点**:
-- 平台侧启动 MCP Server，暴露 `read_file` / `write_file` / `search_code` 等工具
-- Reasonix 启动时通过 `--mcp` 参数连接平台 MCP Server
-- 工具调用结果通过 progress 事件流式返回
-
----
-
-## 各需求技术路径
-
-| 需求 | 需改 Reasonix | 需改平台后端 | 需改前端 |
-|---|---|---|---|
-| R1 推理气泡 | `platform-output.ts`（新增 reasoning channel） | `ipc/agents.ts`（转发 channel） | `App.vue`（推理气泡组件） |
-| R2 记忆系统 | 新增 `--memory` 参数支持 | `database/migrations.ts` + `repository.ts` | `App.vue`（记忆浏览） |
-| R3 Session 回放 | 无 | `ipc/agents.ts`（replay 通道） | `App.vue`（回放控件） |
-| R4 MCP 集成 | 通过 `--mcp` 参数（已有支持） | 新增 MCP Server 模块 | 无 |
-
----
-
-## 实现顺序建议
-
-1. **R1 推理气泡** — 改动量最小，体验提升最明显，适合作为 Phase 3 第一个迭代
-2. **R4 MCP 集成** — 解锁 Reasonix 的文件读写能力，使 PM 模式更实用
-3. **R2 长期记忆系统** — 跨会话上下文持久化，提升持续协作能力
-4. **R3 Session 回放** — 开发调试与问题排查利器
-
----
-
-## 不做
-
-| 事项 | 原因 |
+| 文件 | 改动 |
 |---|---|
-| Agent 内部能力增强 | 平台不侵入 CLI 内部逻辑，能力由 Agent 上游决定 |
-| 端到端自动化测试 | 当前无测试框架，后续建立 |
-| 多项目仪表盘 | 超出当前范围 |
+| `electron/agents/adapter.ts` | `AgentEvent` 接口增加 `_sender?: {...}` 字段 |
+| `electron/agents/manager.ts` | stdout 事件解析后注入 `_sender: { label, id }` |
+| `electron/agents/reasonix.ts` | 适配器提供身份声明 |
+| `electron/agents/codewhale.ts` | 适配器提供身份声明 |
+| `docs/PROTOCOL.md` | 更新当前实现匹配 ProjectVision 协议 |
+
+
+### 3.2 Agent 标签注册系统
+
+**需求**：每个 Agent 接入时声明 `best_for`、`not_for`、`execution_model`、`context_budget`。
+
+**改动范围**：
+
+| 文件 | 改动 |
+|---|---|
+| `electron/agents/adapter.ts` | 新增 `manifest?: AgentManifest` 接口 |
+| `electron/agents/manager.ts` | `list()` 返回 manifest 信息 |
+| `electron/agents/codewhale.ts` | 实现 `manifest`（参照 ProjectVision/ARCHITECTURE.md） |
+| `electron/agents/reasonix.ts` | 实现 `manifest`（参照 ProjectVision/ARCHITECTURE.md） |
+| `electron/ipc/agents.ts` | 新增 `agent:manifest` IPC 通道 |
+| `electron/preload.ts` | 暴露 `agent.getManifest()` |
+| `src/App.vue` | Agent 选择器下拉增加标签辅助信息 |
+
+### 3.3 协议文档更新
+
+**改动范围**：
+
+| 文件 | 改动 |
+|---|---|
+| `docs/PROTOCOL.md` | 用实际代码实现覆盖 ProjectVision 协议定义，标注已实现和待实现 |
+
+---
+
+## Phase 4：调度智能
+
+> **目标**：让调度器真正"智能"起来——按标签匹配、并行度控制、上下文传递。
+
+### 4.1 标签驱动调度
+
+**改动范围**：
+
+| 文件 | 改动 |
+|---|---|
+| `electron/agents/manager.ts` | `exec()` 增加标签匹配检查 |
+| `src/App.vue` | 模式选择器与标签系统联动 |
+| 新增 `electron/scheduler/` | 调度器模块剥离独立逻辑 |
+
+### 4.2 并行执行引擎
+
+**现状**：`executeAllTasks()` 串行循环执行任务。parallel_group 信息由 PM 产出但未被利用。
+
+**改动范围**：
+
+| 文件 | 改动 |
+|---|---|
+| `src/App.vue` | `executeAllTasks()` 改为按 parallel_groups 分批，组内并行，组间串行 |
+| `electron/agents/manager.ts` | 支持 `max_instances` 并发上限 |
+| 新增 `electron/scheduler/executor.ts` | 并行执行引擎（信号量控制并发数） |
+
+### 4.3 上下文传递
+
+**需求**：任务执行的 context（scope、deltas）从 PM 产出 → 注入到下游 Agent。
+
+**改动范围**：
+
+| 文件 | 改动 |
+|---|---|
+| `electron/agents/task-parser.ts` | 解析 PM 产出的 context 信息 |
+| `electron/ipc/agents.ts` | completion 事件回收 deltas |
+| `electron/agents/adapter.ts` | spawnExec 增加 context 参数 |
+| `electron/agents/reasonix.ts` | 通过 `--context` 或环境变量注入 scope + deltas |
+
+### 4.4 执行模式 UI
+
+| 模式 | 行为 | 实现状态 |
+|---|---|---|
+| **YOLO** 🚀 | 全自动，审批跳过 | ⬜ 待实现 |
+| **审批** ✅ | 任务列表 → 用户确认 → 执行 | ✅ 已有（审批 Plan） |
+| **逐步** 👣 | 每组执行前询问 | ⬜ 待实现 |
+| **预览** 👀 | 只看计划不执行 | ⬜ 待实现 |
+
+### 4.5 文件冲突检测
+
+**改动范围**：
+
+| 文件 | 改动 |
+|---|---|
+| `electron/scheduler/executor.ts` | 检查同一组内任务的 scope 文件是否有交集 |
+| `src/App.vue` | 冲突时显示警告，自动降级为串行 |
+
+---
+
+## Phase 5：动态调整
+
+> **目标**：Agent 执行中可向 PM 提建议，PM 动态增删改任务。**这是 ProjectVision 中最具差异化的能力。**
+
+### 5.1 Suggestion 协议
+
+**改动范围**：
+
+| 文件 | 改动 |
+|---|---|
+| `electron/agents/adapter.ts` | AgentEvent 增加 `suggestion` 事件类型 |
+| `electron/agents/manager.ts` | stdout 解析 `suggestion` 事件，注入 `_sender` |
+| `electron/ipc/agents.ts` | `suggestion` 事件处理：转发给 PM 或缓存 |
+| `src/App.vue` | 前端 suggestion 指示（"Agent 正在提建议..."） |
+
+### 5.2 PM 生命周期管理
+
+**改动范围**：
+
+| 文件 | 改动 |
+|---|---|
+| `electron/ipc/agents.ts` | 收到 suggestion 时检查 PM 进程存活 |
+| `electron/agents/manager.ts` | 查询 PM 进程状态 + 重新 spawn PM（注入当前上下文） |
+| 新增 `electron/scheduler/pm-lifecycle.ts` | PM 状态追踪 + 上下文快照 |
+
+### 5.3 任务动态调整
+
+**改动范围**：
+
+| 文件 | 改动 |
+|---|---|
+| `electron/ipc/agents.ts` | `task:update` / `task:add` / `task:cancel` 事件处理 |
+| `electron/ipc/tasks.ts` | 新增 IPC 通道 `db:updateTaskDescription` |
+| `src/App.vue` | 任务面板支持动态更新（修改描述 / 新增卡片 / 取消标记） |
+
+---
+
+## Phase 6：高级协议 + 生态
+
+> **目标**：MCP 工具注入、子 Agent 调度、记忆系统、推理气泡。
+
+### 6.1 推理气泡 (原 Phase 3 R1)
+
+**说明**：让用户实时看到 Agent 的推理过程，解决输出断断续续问题。
+
+| 文件 | 改动 |
+|---|---|
+| `agents/reasonix/src/cli/platform-output.ts` | 转发 `reasoningDelta` 带 `channel: "reasoning"` 标记 |
+| `electron/ipc/agents.ts` | 透传 reasoning channel |
+| `src/App.vue` | 推理气泡组件（灰色/蓝色，逐 token 流式） |
+
+### 6.2 MCP 工具注入 (原 Phase 3 R4)
+
+**说明**：平台提供 MCP Server，向 Agent 注入文件读/写/搜索等工具，使 Reasonix 在 platform 模式下具备实际环境交互能力。
+
+| 文件 | 改动 |
+|---|---|
+| 新增 `electron/mcp/server.ts` | MCP 服务器（暴露 read_file / write_file / search_code） |
+| `electron/agents/reasonix.ts` | spawnExec 增加 `--mcp` 参数指向平台 MCP Server |
+| `electron/main.ts` | 启动 MCP Server |
+
+### 6.3 长期记忆系统 (原 Phase 3 R2)
+
+**说明**：跨会话的项目级 Agent 记忆持久化。
+
+| 文件 | 改动 |
+|---|---|
+| `electron/database/migrations.ts` | 新增 `memories` 表 |
+| `electron/database/repository.ts` | `saveMemory` / `loadMemories` |
+| `electron/ipc/tasks.ts` | IPC 通道 |
+| `electron/preload.ts` | 暴露到渲染进程 |
+
+### 6.4 Session 回放 (原 Phase 3 R3)
+
+| 文件 | 改动 |
+|---|---|
+| `electron/ipc/agents.ts` | `agent:replay` 通道 |
+| `src/App.vue` | 播放/暂停/速度/进度条 |
+
+### 6.5 Tool Calling / Q&A / Sub-Agent（预留）
+
+详见 `ProjectVision/PROTOCOL.md` "后续阶段"章节。当前不纳入时间表。
+
+---
+
+## 阶段全景
+
+| 阶段 | 主题 | 核心交付 | 依赖 |
+|---|---|---|---|
+| **Phase 1** ✅ | 平台底座 | Electron + IPC + SQLite + 双 CLI 适配 | — |
+| **Phase 2** ✅ | Mission 协同 | PM 拆解 + 审批 + 并行执行 + 汇总 | Phase 1 |
+| **Phase 3** | 协议基础 | `_sender` metadata + 标签注册 + 协议文档 | Phase 1-2 |
+| **Phase 4** | 调度智能 | parallel_groups 调度 + 上下文传递 + 4 种模式 | Phase 3 |
+| **Phase 5** | 动态调整 | suggestion + PM 生命周期 + task 动态增删改 | Phase 3-4 |
+| **Phase 6** | 高级协议 | 推理气泡 + MCP + 记忆 + 回放 | Phase 1-5 |
+
+各阶段之间不是严格的串行关系。Phase 3 是其余所有阶段的基础设施。Phase 4-6 可根据资源情况适当合并或调整顺序。
+
+---
+
+## 参考
+
+- [ProjectVision/CONCEPT.md](../ProjectVision/CONCEPT.md) — 核心概念
+- [ProjectVision/ARCHITECTURE.md](../ProjectVision/ARCHITECTURE.md) — 架构设计
+- [ProjectVision/PROTOCOL.md](../ProjectVision/PROTOCOL.md) — 通信协议
+- [ProjectVision/SCENARIO.md](../ProjectVision/SCENARIO.md) — 场景推演
+- [ProjectVision/PERSONA.md](../ProjectVision/PERSONA.md) — 用户画像

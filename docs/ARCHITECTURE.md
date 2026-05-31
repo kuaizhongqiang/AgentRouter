@@ -1,6 +1,7 @@
-# AgentRouter — 架构决策
+# AgentRouter — 架构决策记录
 
-> 最终采用**平台路由模式**（区别于之前的"模式 A/B/C"讨论）。
+> **文档状态**: 已由 [ProjectVision/ARCHITECTURE.md](../ProjectVision/ARCHITECTURE.md) 取代 ✅
+> 本文档保留作为 Phase 1-2 的选型记录。后续架构设计以 ProjectVision 为准。
 
 ---
 
@@ -13,33 +14,6 @@
 | 决策人 | AgentRouter team |
 
 > **文档状态**: 已落地 ✅ — Phase 1 已验证平台路由模式、适配器框架、IPC 拆分
-
----
-
-## 架构概览
-
-```
-绑定项目路径 → 用户输入需求
-                  │
-                  ▼
-          [平台路由] ← 下拉选择 PM Agent（默认 Reasonix）
-           │      │
-       调用      维护
-    (spawn CLI)  (记消息/记任务/存 events)
-           │
-           ▼
-    PM Agent 分析需求 → 产出结构化任务列表
-                  │
-                  ▼
-          平台按 parallel_groups 调度
-           │        │       │
-         t1        t2      t3
-    CodeWhale  CodeWhale  Reasonix
-           │        │       │
-           └────────┴───────┘
-                  │
-          结果汇聚到平台 UI
-```
 
 ---
 
@@ -79,10 +53,22 @@ CLI 的内部逻辑完全不动。CLI 不依赖平台，把平台当作一个自
 
 ---
 
+## 后续演进
+
+ProjectVision 定义了完整的架构：
+
+| 维度 | ProjectVision 参考 |
+|---|---|
+| **协同模型**（6 维度） | `ProjectVision/ARCHITECTURE.md` — 任务分解/Agent 指派/任务回收/PM 质量/多 Agent 协同/动态调整 |
+| **标签系统** | Agent 注册声明：`best_for` / `not_for` / `execution_model` / `context_budget` |
+| **执行模型** | sub-agent / multi-process / single 三种并行模式 |
+| **上下文预算** | 全量/增量/差异三种读取模式，Token 经济核算 |
+
+---
+
 ## 相关文档
 
 - `GOALS.md` — 项目目标
-- `PHASE1.md` — 第一期实施范围
+- `PHASE3.md` — 后续阶段规划（基于 ProjectVision）
 - `SCENARIO.md` — 全流程场景推演
-- `PROTOCOL.md` — CLI↔平台通信协议
-- `CLI_MODIFICATION.md` — CLI 改造方案
+- [ProjectVision/](../ProjectVision/) — 完整愿景文档体系

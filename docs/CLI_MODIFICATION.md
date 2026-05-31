@@ -1,5 +1,8 @@
 # AgentRouter — CLI 改造方案
 
+> **文档状态**: 已归档 🗄️ — Phase 1-2 的 CLI 改造记录。后续 Agent 接入指南请参考 [ProjectVision/ARCHITECTURE.md](../ProjectVision/ARCHITECTURE.md) 标签系统章节。
+> 当前代码位于 `electron/agents/`。
+
 > 原则：主体功能不动，只改输入输出接口。
 
 ---
