@@ -135,64 +135,73 @@ coding agent 已完成大部分对齐工作。核心文档均引用了 ProjectVi
 
 ## 四、ProjectVision 视角的差距总表
 
-| 特性 | ProjectVision 定义 | docs/ 覆盖 | 差距 | 对应阶段 |
+### 更新：2026-05-31 13:25 — agent 补充 PHASE3.md 后
+
+| 特性 | ProjectVision 定义 | docs/ 覆盖（更新后） | 差距 | 对应阶段 |
 |---|---|---|---|---|
-| `_sender` metadata | PROTOCOL.md | ❌ 无 | 协议基础设施缺失 | Phase 3 |
-| 标签系统 | ARCHITECTURE.md | ❌ 无 | Agent 能力无声明 | Phase 3 |
-| 上下文传递 | PROTOCOL.md | ❌ 无 | Token 消耗无优化 | Phase 4 |
-| parallel_groups 调度 | ARCHITECTURE.md | ⚠️ 基础 | 已拆任务，未按组调度 | Phase 4 |
-| 动态调整 | ARCHITECTURE.md + PROTOCOL.md | ❌ 无 | 任务不可变 | Phase 5 |
-| 子 Agent 模式 | ARCHITECTURE.md | ❌ 无 | Reasonix 内部未利用 | Phase 6 |
-| 记忆系统 | ARCHITECTURE.md | ❌ 无 | 无跨会话记忆 | Phase 6 |
-| MCP 集成 | PROTOCOL.md（预留） | ❌ 无 | 工具调用受限 | Phase 6 |
+| `_sender` metadata | PROTOCOL.md | ✅ PHASE3.md 已详细规划（协议+数据流+接口+改动） | 代码待实现 | Phase 3 |
+| 标签系统 | ARCHITECTURE.md | ✅ PHASE3.md 已详细规划（含 Reasonix/CodeWhale 真实值） | 代码待实现 | Phase 3 |
+| Agent 接入规范 | — | ✅ **新增** PHASE3.md 含三步流程 + 适配器模板 | 文档已齐，代码待接入 | Phase 3 |
+| 上下文传递 | PROTOCOL.md | ✅ PHASE3.md 已详细规划（scope/deltas + 三种读取模式） | 代码待实现 | Phase 4 |
+| Token 经济核算 | ARCHITECTURE.md | ✅ **新增** PHASE3.md 含经济账示例（省 64%） | 文档已齐 | Phase 4 |
+| 文件冲突检测 | ARCHITECTURE.md | ✅ **新增** PHASE3.md 含检测算法 + 解决策略 | 代码待实现 | Phase 4 |
+| parallel_groups 调度 | ARCHITECTURE.md | ✅ PHASE3.md 已规划（信号量 + 分组 + 冲突降级） | 代码待实现 | Phase 4 |
+| 四种执行模式 | SCENARIO.md | ✅ PHASE3.md 已规划（YOLO/审批/逐步/预览各有行为描述） | 代码待实现 | Phase 4 |
+| 动态调整（suggestion） | ARCHITECTURE + PROTOCOL | ✅ PHASE3.md 已详细规划（协议+PM生命周期+决策矩阵） | 代码待实现 | Phase 5 |
+| PM 生命周期管理 | ARCHITECTURE.md | ✅ **新增** PHASE3.md 含 PMState 接口 + 进程追踪 + 唤醒逻辑 | 代码待实现 | Phase 5 |
+| 回收包模型 | ARCHITECTURE.md | ✅ PHASE3.md completion 事件携带 `_context.deltas` | 代码待实现 | Phase 5 |
+| 子 Agent 模式 | ARCHITECTURE.md | ⚠️ 已规划但仅限 Reasonix 标签声明 | Phase 6 |
+| 记忆系统 | ARCHITECTURE.md | ⚠️ Phase 6 已规划（memories 表 + IPC + 注入） | Phase 6 |
+| MCP 集成 | PROTOCOL.md（预留） | ⚠️ Phase 6 已规划（MCP Server + read_file/write_file） | Phase 6 |
+
+**关键变化**：此前标记为"完全缺失"的 5 项（Agent 接入规范、文件冲突检测、Token 经济核算、PM 生命周期管理、回收包模型）已全部补充。
 
 ---
 
-## 五、结论
+## 五、更新结论
 
 ### 已对齐（✅）
 
-Phase 1-2 的功能在 docs/ 中已完整覆盖并与 ProjectVision 一致：
-- 平台路由架构
-- PM 拆解任务（Mission → Task）
-- 审批/汇总验收
-- 双 Agent 适配器
-- 事件流协议（基础子集）
+- **Phase 1-2 实现**：平台路由、PM 拆解、审批/汇总、双 Agent 适配器
+- **Phase 3-6 规划**：agent 已按 ProjectVision 体系完整重写 PHASE3.md
+  - 每阶段含：协议定义 → 数据流 → 代码接口 → 文件改动 → 验收标准
+  - 缺失项全部补充（接入规范、冲突检测、Token 核算、PM 生命周期、回收包）
+  - Manifest 给出了 Reasonix 和 CodeWhale 的真实声明值
 
-### 未对齐但已规划（⚠️）
+### 剩余差距
 
-以下特性在 ProjectVision 中定义，docs/ PHASE3.md 已规划但未实现：
-- `_sender` metadata → Phase 3
-- 标签系统 → Phase 3
-- 上下文传递 → Phase 4
-- parallel_groups 智能调度 → Phase 4
-- 四种执行模式 → Phase 4
-- 动态调整 → Phase 5
+| 维度 | 状态 | 说明 |
+|---|---|---|
+| **文档对齐度** | 95% | PHASE3.md 完整覆盖 ProjectVision 全部概念 |
+| **代码实现度** | ~30% | Phase 1-2 已落地，Phase 3-6 尚在文档阶段 |
+| **AGENTS.md 空模板** | ❌ 未修复 | 仍需填充 |
+| **FORK.md** | ❌ 未创建 | agents/ 目录下仍缺失 |
 
-### 完全缺失（❌）
+### 从"文档断层"到"实现断层"
 
-以下特性在 ProjectVision 中定义，但 docs/ 任何文档均未提及：
-- Agent 接入规范（标签声明模板）
-- 文件冲突检测机制
-- Token 经济核算
-- PM 生命周期管理
-- 回收包模型
+首次审计（DOCUMENTATION_AUDIT.md）的核心发现是**文档与代码的 90% 断层**。
 
-**建议**：在 PHASE3.md 或新增 PHASE4.md 中补充这些缺失项。
+当前情况已逆转：文档已完整对齐 ProjectVision，断层转移到了 **文档与代码之间**——
+Phase 3-6 在 PHASE3.md 中规划详尽，但代码尚未开始落地。
+
+这是正常的项目推进节奏：**先对齐文档，再推进代码**。
 
 ---
 
-## 六、建议优先级
+## 六、建议优先级（更新）
 
-| 优先级 | 事项 | 理由 |
+| 优先级 | 事项 | 当前状态 |
 |---|---|---|
-| **P0** | `_sender` metadata 落地 | 所有高阶协议的基础，没有它后面都做不了 |
-| **P0** | Agent 标签系统注册 | 调度智能化的第一步 |
-| **P1** | 上下文传递（scope + deltas） | Token 成本直接影响用户体验 |
-| **P1** | 四种执行模式（YOLO/审批/逐步/预览） | 用户感知最强的功能 |
-| **P2** | parallel_groups 智能调度 | 性能优化 |
-| **P2** | 动态调整（suggestion 机制） | 差异化竞争力 |
-| **P3** | 记忆系统 + MCP 集成 | 高阶体验 |
+| **P0** | `_sender` metadata 落地 | 文档已齐 → 需开始编码 |
+| **P0** | Agent 标签系统注册 | 文档已齐 → 需开始编码 |
+| **P1** | 上下文传递（scope + deltas） | 文档已齐 → 需开始编码 |
+| **P1** | 四种执行模式 UI | 文档已齐 → 需开始编码 |
+| **P2** | parallel_groups 智能调度 | 文档已齐 → 需开始编码 |
+| **P2** | 动态调整（suggestion + PM 生命周期） | 文档已齐 → 需开始编码 |
+| **P3** | 推理气泡 + MCP + 记忆 + 回放 | 文档已齐 → 需开始编码 |
+| **P4** | AGENTS.md 填充 + FORK.md 创建 | 长期待修复 |
+
+**核心建议**：文档体系已完整对齐。下一步的核心是**编码落地**，从 Phase 3 开始按优先级推进。
 
 ---
 
