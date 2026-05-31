@@ -28,4 +28,16 @@ export function registerTaskHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('db:listAgentLogs', async (_e, sessionId: string) => {
     return repo.listAgentLogs(sessionId);
   });
+
+  ipcMain.handle('db:batchAddTasks', async (_e, sessionId: string, projectId: string, tasks: { title: string; assignee?: string; description?: string }[]) => {
+    return repo.batchAddTasks(sessionId, projectId, tasks);
+  });
+
+  ipcMain.handle('db:updateTask', async (_e, id: string, fields: { assignee?: string; status?: string; description?: string }) => {
+    return repo.updateTask(id, fields);
+  });
+
+  ipcMain.handle('db:approvePlan', async (_e, sessionId: string) => {
+    return repo.approveSessionPlan(sessionId);
+  });
 }

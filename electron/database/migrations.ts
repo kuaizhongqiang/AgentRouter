@@ -66,6 +66,16 @@ CREATE TABLE IF NOT EXISTS agent_logs (
 ALTER TABLE sessions ADD COLUMN agentType TEXT NOT NULL DEFAULT '';
 `;
 
+const SCHEMA_V3 = `
+-- sessions 表：添加 type 列 (chat / mission)
+ALTER TABLE sessions ADD COLUMN type TEXT NOT NULL DEFAULT 'chat';
+
+-- tasks 表：添加 assignee / description / sort_order 列
+ALTER TABLE tasks ADD COLUMN assignee TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN description TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+`;
+
 /**
  * 运行所有迁移
  */
@@ -106,6 +116,7 @@ export function runMigrations(db: Database): void {
   const migrations: Array<{ id: number; name: string; sql: string }> = [
     { id: 1, name: 'v1-initial-schema', sql: SCHEMA_V1 },
     { id: 2, name: 'v2-agent-logs', sql: SCHEMA_V2 },
+    { id: 3, name: 'v3-session-type-task-fields', sql: SCHEMA_V3 },
   ];
 
   for (const m of migrations) {

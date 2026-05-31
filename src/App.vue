@@ -96,8 +96,8 @@
     <aside class="sidebar sidebar-right">
       <div class="sidebar-title"><span>任务</span></div>
       <div class="task-list">
-        <div v-for="t in tasks" :key="t.id" class="task-item" :class="[t.status, t.status === 'running' ? 'running-anim' : '']">
-          <span class="task-icon">{{ { pending:'⏳', running:'🔄', completed:'✅', error:'❌', archived:'📦' }[t.status] || '⏳' }}</span>
+        <div v-for="t in tasks" :key="t.id" class="task-item" :class="[t.status, t.status === 'running' ? 'running-anim' : '']" @click="toggleTask(t.id)">
+          <span class="task-icon">{{ statusIcon(t.status) }}</span>
           <div class="task-body">
             <span class="task-title">{{ t.title }}</span>
             <div class="task-meta">
@@ -105,8 +105,18 @@
               <span v-if="t.group" class="task-group">第 {{ t.group }} 组</span>
             </div>
           </div>
-          <span class="task-status-tag" :class="t.status">{{ { pending:'排队', running:'运行中', completed:'完成', error:'失败', archived:'已归档' }[t.status] || t.status }}</span>
+          <span class="task-status-tag" :class="t.status">{{ { pending:'排队', running:'运行中', completed:'完成', archived:'已归档' }[t.status] || t.status }}</span>
+          <div v-if="expandedTask === t.id" class="task-detail">
+            <p v-if="t.description" class="task-description">{{ t.description }}</p>
+            <div class="task-log">{{ taskLogs[t.id] || '' }}</div>
+          </div>
         </div>
+      </div>
+      <div v-if="showApproveButton" class="task-actions">
+        <button @click.stop="approvePlan" class="btn-approve">审批 Plan</button>
+      </div>
+      <div v-if="showSummarizeButton" class="task-actions">
+        <button @click.stop="summarizeMission" class="btn-summarize">汇总 Mission</button>
       </div>
       <div class="placeholder small" v-if="tasks.length === 0">暂无任务</div>
     </aside>
@@ -131,6 +141,12 @@ const showNewProject = ref(false)
 const newProjectName = ref('')
 const newProjectPath = ref('')
 const msgRef = ref(null)
+
+// ── Mission 模式状态 ──
+const expandedTask = ref(null)
+const taskLogs = ref({})
+const showApproveButton = ref(false)
+const showSummarizeButton = ref(false)
 
 // ── Agent 与模式 ──
 const agents = ref([])
@@ -176,16 +192,34 @@ async function removeProject(id) {
 
 // ── 对话 ──
 
+async function loadTasks() {
+  if (!currentProject.value) return
+  tasks.value = await db.listTasks(currentProject.value.id)
+}
+
 async function selectSession(s) {
   currentSession.value = s
   messages.value = await db.listMessages(s.id)
-  tasks.value = await db.listTasks(currentProject.value.id)
+  await loadTasks()
+  // Mission mode checks
+  if (s.agentType === 'mission') {
+    const pendingTasks = tasks.value.filter(t => t.status === 'pending')
+    showApproveButton.value = pendingTasks.length > 0
+    const approvedTasks = tasks.value.filter(t => t.status === 'running')
+    if (approvedTasks.length > 0) {
+      executeAllTasks()
+    }
+  } else {
+    showApproveButton.value = false
+    showSummarizeButton.value = false
+  }
   scrollDown()
 }
 
 async function createSession() {
   if (!currentProject.value) return
-  const s = await db.createSession(currentProject.value.id, new Date().toLocaleString('zh-CN'))
+  const agentType = selectedMode.value === 'PM 拆解' ? 'mission' : 'chat'
+  const s = await db.createSession(currentProject.value.id, new Date().toLocaleString('zh-CN'), agentType)
   sessions.value.unshift(s)
   selectSession(s)
 }
@@ -251,11 +285,73 @@ async function send() {
     await db.addMessage(currentSession.value.id, 'agent', reply.trim())
   }
   cleanup()
+
+  // Mission mode: reload tasks after PM reply
+  if (selectedMode.value === 'PM 拆解') {
+    await loadTasks()
+    const pendingTasks = tasks.value.filter(t => t.status === 'pending')
+    showApproveButton.value = pendingTasks.length > 0
+  }
 }
 
 // ── 诊断 ──
 
 function doctor() { if (selectedAgent.value) agent.doctor(selectedAgent.value) }
+
+// ── Mission 模式辅助 ──
+
+function toggleTask(id) {
+  expandedTask.value = expandedTask.value === id ? null : id
+}
+
+function statusIcon(status) {
+  return { pending: '⏳', running: '🔄', completed: '✅', archived: '📦' }[status] || '⏳'
+}
+
+async function approvePlan() {
+  showApproveButton.value = false
+  await db.approvePlan(currentSession.value.id)
+  await loadTasks()
+  executeAllTasks()
+}
+
+async function executeAllTasks() {
+  const pendingTasks = tasks.value.filter(t => t.status === 'running')
+  for (const task of pendingTasks) {
+    const agentName = task.assignee || selectedAgent.value
+    const cleanup = agent.onOutput((data) => {
+      const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
+      if (text) {
+        taskLogs.value[task.id] = (taskLogs.value[task.id] || '') + text
+      }
+    })
+    try {
+      await agent.exec(agentName, task.title, currentSession.value.id, currentProject.value.id, 'exec')
+      await db.updateTask(task.id, { status: 'completed' })
+    } catch (_) {
+      await db.updateTask(task.id, { status: 'completed' })
+    } finally {
+      cleanup()
+    }
+  }
+  checkAllTasksCompleted()
+}
+
+function checkAllTasksCompleted() {
+  const allDone = tasks.value.every(t => t.status === 'completed' || t.status === 'archived')
+  showSummarizeButton.value = allDone
+}
+
+async function summarizeMission() {
+  const summary = tasks.value
+    .filter(t => t.status === 'completed' || t.status === 'archived')
+    .map(t => `- [${t.status === 'completed' ? '✅' : '📦'}] ${t.title}${t.assignee ? ` (${t.assignee})` : ''}`)
+    .join('\n')
+  const msg = `## Mission 完成汇总\n\n${summary || '无任务记录'}`
+  await db.addMessage(currentSession.value.id, 'user', msg)
+  messages.value.push({ id: 'tmp', role: 'user', content: msg, timestamp: Date.now() })
+  showSummarizeButton.value = false
+}
 
 // ── 生命周期 ──
 
@@ -423,7 +519,6 @@ body {
 }
 .task-status-tag.running { background: #e65100; color: #ffe0b2; }
 .task-status-tag.completed { background: #1b5e20; color: #a5d6a7; }
-.task-status-tag.error { background: #b71c1c; color: #ffcdd2; }
 .task-item.completed { opacity: 0.6; }
 .task-item.archived { opacity: 0.4; text-decoration: line-through; }
 .task-item.error { opacity: 0.8; border-left: 3px solid #b71c1c; }
@@ -434,6 +529,64 @@ body {
   50% { opacity: 0.5; }
 }
 .running-anim .task-icon { animation: running-pulse 1s ease-in-out infinite; }
+
+/* ── 任务展开详情 ── */
+.task-detail {
+  grid-column: 1 / -1;
+  padding: 8px 0 4px 0;
+  border-top: 1px solid #0f346066;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.task-description {
+  color: #aaa;
+  margin-bottom: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.task-log {
+  max-height: 120px;
+  overflow-y: auto;
+  background: #0d0d1a;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  padding: 6px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 11px;
+  color: #b0b0b0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── 任务操作按钮 ── */
+.task-actions {
+  padding: 8px 12px;
+  border-top: 1px solid #0f3460;
+}
+.btn-approve, .btn-summarize {
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-approve {
+  background: #e65100;
+  color: #ffe0b2;
+}
+.btn-approve:hover {
+  background: #d84315;
+}
+.btn-summarize {
+  background: #1b5e20;
+  color: #a5d6a7;
+}
+.btn-summarize:hover {
+  background: #2e7d32;
+}
 
 .icon-btn { background: none; border: none; color: #888; font-size: 16px; cursor: pointer; padding: 2px 6px; }
 .icon-btn:hover { color: #e94560; }

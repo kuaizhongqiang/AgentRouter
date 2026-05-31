@@ -56,20 +56,20 @@
 
 ## 当前状态 → 目标状态
 
-| 维度 | 当前 | 目标 |
+| 维度 | 当前（Phase 1 完成后） | 目标 |
 |---|---|---|
-| Agent 数量 | 仅 CodeWhale（硬编码） | 多 Agent 可扩展 |
-| Agent 调度 | main.cjs 单文件 spawn | 适配器模式，统一管理 |
-| 数据持久化 | SQLite 基础 CRUD | 结构化存储 + 记忆系统 |
-| 前端 | App.vue 350 行大泥球 | 组件化 + 状态管理 |
-| 类型安全 | 纯 JS | TypeScript |
+| Agent 数量 | CodeWhale + Reasonix 双 Agent（适配器注册表） | 多 Agent 可扩展 |
+| Agent 调度 | 适配器模式 + AgentManager 统一管理 | 同一架构 |
+| 数据持久化 | SQLite sql.js + migration 机制 + agent_logs 表 | + 记忆系统（Phase 3） |
+| 前端 | App.vue 三栏面板 + Agent 选择器 + 模式选择器 | 组件化 + 状态管理（Phase 2） |
+| 类型安全 | TypeScript（全部 electron/ 已迁移） | 同左 |
 
 ---
 
 ## 后续步骤
 
 1. ✅ 目标已确定
-2. ⬜ 架构设计（模块划分、数据流、IPC）
-3. ⬜ 分阶段实施计划
-4. ⬜ 技术选型细化
-5. ⬜ 开始编码
+2. ✅ 架构设计（已产出 ARCHITECTURE.md、PROTOCOL.md 等 10 份文档）
+3. ✅ 分阶段实施计划（PHASE1.md + PHASE2.md）
+4. ✅ Phase 1 已完成（后端 TypeScript/IPC 拆分/适配器框架/双 CLI 改造）
+5. ⬜ Phase 2 进行中（Mission 驱动协同 + 多 Agent 并行执行）

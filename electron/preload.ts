@@ -81,6 +81,17 @@ contextBridge.exposeInMainWorld('db', {
   archiveTask: (id: string) => ipcRenderer.invoke('db:archiveTask', id),
   getTask: (id: string) => ipcRenderer.invoke('db:getTask', id),
 
+  // 批量任务操作
+  batchAddTasks: (sessionId: string, projectId: string, tasks: { title: string; assignee?: string; description?: string }[]) =>
+    ipcRenderer.invoke('db:batchAddTasks', sessionId, projectId, tasks),
+
+  updateTask: (id: string, fields: { assignee?: string; status?: string; description?: string }) =>
+    ipcRenderer.invoke('db:updateTask', id, fields),
+
+  /** 批准会话计划 — 将计划中的任务批量插入 */
+  approvePlan: (sessionId: string) =>
+    ipcRenderer.invoke('db:approvePlan', sessionId),
+
   // Agent 日志
   listAgentLogs: (sessionId: string) => ipcRenderer.invoke('db:listAgentLogs', sessionId),
 });

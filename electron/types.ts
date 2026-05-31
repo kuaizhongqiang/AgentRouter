@@ -14,6 +14,7 @@ export interface Session {
   projectId: string;
   title: string;
   agentType: string;
+  type: 'chat' | 'mission';
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +32,9 @@ export interface Task {
   sessionId: string;
   projectId: string;
   title: string;
+  assignee: string;
+  description: string;
+  sort_order: number;
   status: 'pending' | 'running' | 'completed' | 'archived';
   createdAt: string;
   updatedAt: string;

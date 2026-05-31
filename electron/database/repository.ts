@@ -84,12 +84,13 @@ export async function createSession(projectId: string, title?: string, agentType
     projectId,
     title: title || '新对话',
     agentType: agentType || '',
+    type: 'chat',
     createdAt: now(),
     updatedAt: now(),
   };
   d.run(
-    'INSERT INTO sessions (id, projectId, title, agentType, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
-    [s.id, s.projectId, s.title, s.agentType, s.createdAt, s.updatedAt]
+    'INSERT INTO sessions (id, projectId, title, agentType, type, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [s.id, s.projectId, s.title, s.agentType, s.type, s.createdAt, s.updatedAt]
   );
   saveDatabase();
   return s;
@@ -173,16 +174,107 @@ export async function addTask(sessionId: string, projectId: string, title: strin
     sessionId,
     projectId,
     title,
+    assignee: '',
+    description: '',
+    sort_order: 0,
     status: 'pending',
     createdAt: now(),
     updatedAt: now(),
   };
   d.run(
-    'INSERT INTO tasks (id, sessionId, projectId, title, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [t.id, t.sessionId, t.projectId, t.title, t.status, t.createdAt, t.updatedAt]
+    'INSERT INTO tasks (id, sessionId, projectId, title, assignee, description, sort_order, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [t.id, t.sessionId, t.projectId, t.title, t.assignee, t.description, t.sort_order, t.status, t.createdAt, t.updatedAt]
   );
   saveDatabase();
   return t;
+}
+
+export async function batchAddTasks(
+  sessionId: string,
+  projectId: string,
+  tasks: { title: string; assignee?: string; description?: string }[]
+): Promise<Task[]> {
+  const d = await db();
+  const created: Task[] = [];
+  const ts = now();
+
+  d.run('BEGIN TRANSACTION');
+  try {
+    for (let i = 0; i < tasks.length; i++) {
+      const t = tasks[i];
+      const task: Task = {
+        id: idgen(),
+        sessionId,
+        projectId,
+        title: t.title,
+        assignee: t.assignee || '',
+        description: t.description || '',
+        sort_order: i,
+        status: 'pending',
+        createdAt: ts,
+        updatedAt: ts,
+      };
+      d.run(
+        'INSERT INTO tasks (id, sessionId, projectId, title, assignee, description, sort_order, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [task.id, task.sessionId, task.projectId, task.title, task.assignee, task.description, task.sort_order, task.status, task.createdAt, task.updatedAt]
+      );
+      created.push(task);
+    }
+    d.run('COMMIT');
+  } catch (err) {
+    d.run('ROLLBACK');
+    throw err;
+  }
+
+  saveDatabase();
+  return created;
+}
+
+export async function updateTask(
+  id: string,
+  fields: { assignee?: string; status?: string; description?: string }
+): Promise<void> {
+  const d = await db();
+  const setClauses: string[] = [];
+  const params: initSqlJs.SqlValue[] = [];
+
+  if (fields.assignee !== undefined) {
+    setClauses.push('assignee = ?');
+    params.push(fields.assignee);
+  }
+  if (fields.status !== undefined) {
+    setClauses.push('status = ?');
+    params.push(fields.status);
+  }
+  if (fields.description !== undefined) {
+    setClauses.push('description = ?');
+    params.push(fields.description);
+  }
+
+  if (setClauses.length === 0) return;
+
+  setClauses.push('updatedAt = ?');
+  params.push(now());
+  params.push(id);
+
+  d.run(`UPDATE tasks SET ${setClauses.join(', ')} WHERE id = ?`, params);
+  saveDatabase();
+}
+
+export async function approveSessionPlan(sessionId: string): Promise<void> {
+  const d = await db();
+  d.run("UPDATE tasks SET status = 'running', updatedAt = ? WHERE sessionId = ? AND status = 'pending'", [now(), sessionId]);
+  saveDatabase();
+}
+
+export async function listTasksBySession(sessionId: string): Promise<Task[]> {
+  const d = await db();
+  const stmt = d.prepare('SELECT * FROM tasks WHERE sessionId = ? ORDER BY sort_order ASC');
+  stmt.bind([sessionId]);
+  const results: Task[] = [];
+  while (stmt.step()) results.push(stmt.getAsObject() as unknown as Task);
+  stmt.free();
+  return results;
 }
 
 export async function updateTaskStatus(id: string, status: Task['status']): Promise<void> {
