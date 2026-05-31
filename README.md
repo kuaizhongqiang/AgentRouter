@@ -26,7 +26,9 @@ AgentRouter/
 │   └── agents/                Agent 管理层
 │       ├── adapter.ts          AgentAdapter 接口
 │       ├── manager.ts          AgentManager (多 Agent 调度)
-│       └── codewhale.ts        CodeWhale 适配器
+│       ├── task-parser.ts      任务块解析器（PM 拆解）
+│       ├── codewhale.ts        CodeWhale 适配器
+│       └── reasonix.ts         Reasonix 适配器
 ├── src/                       Vue 3 前端
 │   └── App.vue                三栏 UI + Agent/模式选择器
 ├── agents/                    Fork 的开源 CLI 源码
@@ -37,6 +39,8 @@ AgentRouter/
 │   ├── ARCHITECTURE.md         架构决策
 │   ├── PROTOCOL.md             CLI↔平台通信协议
 │   ├── PHASE1.md               第一期实施范围
+│   ├── PHASE2.md               第二期实施范围
+│   ├── PHASE3.md               第三期规划
 │   ├── SCENARIO.md             全流程场景推演
 │   ├── CLI_MODIFICATION.md     CLI 改造方案
 │   ├── FORK_MANAGEMENT.md      Fork 管理与署名
@@ -53,37 +57,44 @@ AgentRouter/
 |---|---|---|
 | **项目管理** | ✅ | 绑定本地路径，多仓库 |
 | **对话/消息** | ✅ | 多标签页，SQLite 持久化 |
-| **单 Agent 执行** | ✅ | 默认 CodeWhale |
-| **Agent 选择器** | ✅ | Web 端已就绪，后端支持多 Agent 路由 |
-| **执行模式** | 🚧 规划中 | YOLO / 审批 / 逐步 / 预览 |
-| **PM 任务拆解** | 🚧 规划中 | Reasonix 担任 PM，产出结构化任务列表 |
-| **多 Agent 并行** | 🚧 规划中 | 按 parallel_groups 调度 |
-| **Reasonix 集成** | ✅ CLI 改造完成 | 新增 `platform` 子命令 |
-| **CodeWhale 集成** | ✅ CLI 改造完成 | 新增 `--mode platform` 参数 |
+| **单 Agent 执行** | ✅ | 默认 CodeWhale，支持 Reasonix |
+| **Agent 选择器** | ✅ | Web 端 + 后端多 Agent 路由 |
+| **PM 任务拆解** | ✅ (Phase 2) | Reasonix 担任 PM，产出结构化任务列表 |
+| **多 Agent 并行** | ✅ (Phase 2) | 按 parallel_groups 调度，并发执行 |
+| **审批/汇总** | ✅ (Phase 2) | 审批 Plan + Mission 汇总验收 |
+| **Reasonix 集成** | ✅ | 新增 `platform` 子命令 + `--role pm` |
+| **CodeWhale 集成** | ✅ | 新增 `--platform-mode` 参数 |
+| **执行模式** | 🚧 Phase 3 | YOLO / 审批 / 逐步 / 预览 |
+| **推理气泡** | 🚧 Phase 3 | 实时显示 Agent 推理过程 |
+| **长期记忆** | 🚧 Phase 3 | 跨会话 Agent 记忆持久化 |
 
 ---
 
 ## Agent 工作流程
 
+### 对话模式
+
 ```
-绑定项目路径 → 用户输入需求
+用户选择 Agent → 输入任务 → Agent 执行 → 结果返回对话
+```
+
+### PM 拆解模式（Phase 2）
+
+```
+用户选择 PM 拆解 → 自动切 Reasonix
                   │
                   ▼
-          [平台路由] → 选择 PM Agent（如 Reasonix）
-           │      │
-        spawn CLI   维护（记消息、记任务、存日志）
-           │
-           ▼
-    PM Agent 分析需求 → 产出结构化任务列表
-                        {tasks: [{id, title, assignee, path, depends_on, parallel_group}]}
+        Reasonix(PM) 分析需求 → 产出结构化任务列表
+                      {tasks: [{id, title, assignee, path, depends_on, parallel_group}]}
                   │
                   ▼
-          平台按 parallel_groups 调度
-           t1 → ar-codewhale
-           t2 → ar-codewhale  (并行)
-           t3 → ar-reasonix
+        用户审批 Plan → 平台按 parallel_groups 并发调度
+                        t1 → codewhale (Group 1)
+                        t2 → codewhale (Group 2, 并行)
+                        t3 → reasonix (Group 2, 并行)
                   │
-          结果汇聚到平台 UI
+                  ▼
+        任务完成 → 用户点"汇总 Mission" → PM 验收总结
 ```
 
 ---

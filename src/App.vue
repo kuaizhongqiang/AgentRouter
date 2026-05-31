@@ -79,7 +79,7 @@
       <div class="input-bar" v-if="currentSession">
         <input
           v-model="userInput"
-          :placeholder="'输入命令给 ' + (selectedAgent || 'Agent') + '...'"
+          :placeholder="selectedMode === 'PM 拆解' ? '输入需求，Reasonix (PM) 将拆解为任务...' : '输入命令给 ' + (selectedAgent || 'Agent') + '...'"
           @keydown.enter="send"
           :disabled="agentStatus !== 'online'"
         />
@@ -124,7 +124,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 
 const agent = window.agent
 const db = window.db
@@ -153,6 +153,16 @@ const agents = ref([])
 const selectedAgent = ref(null)
 const selectedMode = ref('对话')
 const modes = ['对话', 'PM 拆解', 'YOLO', '审批', '逐步', '预览']
+
+// PM 拆解模式自动切换到 Reasonix
+watch(selectedMode, (newMode) => {
+  if (newMode === 'PM 拆解') {
+    const reasonix = agents.value.find(a => a.name === 'reasonix')
+    if (reasonix) {
+      selectedAgent.value = 'reasonix'
+    }
+  }
+})
 
 // ── 项目 ──
 
@@ -332,6 +342,8 @@ async function executeAllTasks() {
       await db.updateTask(task.id, { status: 'completed' })
     } finally {
       cleanup()
+      // 重新加载任务确保状态同步
+      await loadTasks()
     }
   }
   checkAllTasksCompleted()
@@ -343,14 +355,49 @@ function checkAllTasksCompleted() {
 }
 
 async function summarizeMission() {
+  showSummarizeButton.value = false
   const summary = tasks.value
     .filter(t => t.status === 'completed' || t.status === 'archived')
-    .map(t => `- [${t.status === 'completed' ? '✅' : '📦'}] ${t.title}${t.assignee ? ` (${t.assignee})` : ''}`)
+    .map(t => {
+      const log = (taskLogs.value[t.id] || '').trim()
+      return `- [${t.status === 'completed' ? '✅' : '📦'}] **${t.title}** (${t.assignee || 'N/A'})${log ? '\n  ```\n  ' + log.slice(0, 500) + '\n  ```' : ''}`
+    })
     .join('\n')
-  const msg = `## Mission 完成汇总\n\n${summary || '无任务记录'}`
+  const msg = `## Mission 完成汇总\n\n以下是所有任务执行结果，请 PM 进行验收总结：\n\n${summary || '无任务记录'}`
   await db.addMessage(currentSession.value.id, 'user', msg)
   messages.value.push({ id: 'tmp', role: 'user', content: msg, timestamp: Date.now() })
-  showSummarizeButton.value = false
+
+  // 调用 Reasonix PM 汇总任务执行结果
+  let reply = ''
+  let done = false
+  const cleanup = agent.onOutput((data) => {
+    const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
+    if (text) {
+      reply += text
+      const last = messages.value[messages.value.length - 1]
+      if (last && last.role === 'agent') {
+        last.content = reply
+      } else {
+        messages.value.push({ id: 'tmp', role: 'agent', agentName: 'reasonix', content: reply, timestamp: Date.now() })
+      }
+    }
+    if (data?.event?.event === 'completion' || data?.event?.event === 'error') {
+      done = true
+    }
+  })
+  try {
+    await agent.exec('reasonix', msg, currentSession.value.id, currentProject.value.id, '对话')
+  } catch (err) {
+    reply += `\n[错误] ${err.message || err}`
+    done = true
+  }
+  const timeout = setTimeout(() => { done = true }, 60000)
+  while (!done) await new Promise(r => setTimeout(r, 100))
+  clearTimeout(timeout)
+  if (reply.trim()) {
+    await db.addMessage(currentSession.value.id, 'agent', reply.trim())
+  }
+  cleanup()
 }
 
 // ── 生命周期 ──
@@ -358,7 +405,11 @@ async function summarizeMission() {
 onMounted(async () => {
   await loadProjects()
   if (agent) {
-    agent.onStatus((s) => { agentStatus.value = typeof s === 'string' ? s : s.status || 'offline' })
+    agent.onStatus((s) => {
+      const st = typeof s === 'string' ? s : s.status || 'offline'
+      // completed/killed 表示执行结束，恢复到 online 让输入框可用
+      agentStatus.value = (st === 'completed' || st === 'killed') ? 'online' : st
+    })
     try {
       agents.value = await agent.list() || []
     } catch (_) {

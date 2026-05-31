@@ -49,18 +49,22 @@ export function parseTasksFromReply(text: string): TaskSpec[] {
     }
   }
 
-  // Strategy 2: ```json block with tasks
+  // Strategy 2: ```json code block
   const jsonBlockMatch = text.match(/```json\s*\n([\s\S]*?)```/);
   if (jsonBlockMatch) {
     try {
       const parsed = JSON.parse(jsonBlockMatch[1].trim());
+      // Format A: { tasks: [...] }
       if (parsed.tasks && Array.isArray(parsed.tasks)) {
         const result = parsed.tasks
-          .map((t: any) => ({
-            title: t.title || '',
-            assignee: t.assignee || '',
-            description: t.description || '',
-          }))
+          .map(normalizeTask)
+          .filter((t: TaskSpec) => t.title);
+        if (result.length > 0) return result;
+      }
+      // Format B: bare array [...] (used by Reasonix PM mode)
+      if (Array.isArray(parsed)) {
+        const result = parsed
+          .map(normalizeTask)
           .filter((t: TaskSpec) => t.title);
         if (result.length > 0) return result;
       }
@@ -86,6 +90,32 @@ export function parseTasksFromReply(text: string): TaskSpec[] {
   }
 
   return tasks;
+}
+
+/**
+ * 规范化任务对象：将 Reasonix/通用格式映射为 TaskSpec。
+ *
+ * 支持的输入格式:
+ *   { title, assignee?, description? }
+ *   { id, title, assignee?, path?, depends_on?, parallel_group? }  (Reasonix PM)
+ */
+function normalizeTask(t: any): TaskSpec {
+  const description = t.description || '';
+  const extra = [
+    t.path ? `路径: ${t.path}` : '',
+    Array.isArray(t.depends_on) && t.depends_on.length > 0
+      ? `依赖: ${t.depends_on.join(', ')}`
+      : '',
+    t.parallel_group ? `并行组: ${t.parallel_group}` : '',
+  ]
+    .filter(Boolean)
+    .join('; ');
+
+  return {
+    title: t.title || '',
+    assignee: t.assignee || '',
+    description: extra ? (description ? `${description}\n${extra}` : extra) : description,
+  };
 }
 
 /**

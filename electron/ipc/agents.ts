@@ -28,14 +28,39 @@ export function registerAgentHandlers(
     if (event.event === 'completion') {
       const ctx = activeContexts.get(agentName);
       if (ctx && ctx.mode === 'PM 拆解') {
-        const text = String(event.data?.summary || event.data?.content || '');
-        if (text) {
-          const tasks = parseTasksFromReply(text);
-          if (tasks.length > 0) {
-            batchAddTasks(ctx.sessionId, ctx.projectId, tasks).catch(err => {
-              console.error('[TaskParser] Failed to batch add tasks:', err);
-            });
+        let tasks: Array<{ title: string; assignee?: string; description?: string }> = [];
+
+        // 1) 优先读取 Reasonix 预解析的 tasks（在 completionData.tasks 中）
+        const rawTasks = event.data?.tasks;
+        if (Array.isArray(rawTasks) && rawTasks.length > 0) {
+          tasks = rawTasks.map((t: any) => ({
+            title: t.title || '',
+            assignee: t.assignee || '',
+            description: [
+              t.path ? `路径: ${t.path}` : '',
+              Array.isArray(t.depends_on) && t.depends_on.length > 0
+                ? `依赖: ${t.depends_on.join(', ')}`
+                : '',
+              t.parallel_group ? `并行组: ${t.parallel_group}` : '',
+            ]
+              .filter(Boolean)
+              .join('; ') || (t.description || ''),
+          })).filter(t => t.title);
+        }
+
+        // 2) 无预解析任务，回退到从回复文本中解析
+        if (tasks.length === 0) {
+          const text = String(event.data?.summary || event.data?.content || '');
+          if (text) {
+            tasks = parseTasksFromReply(text);
           }
+        }
+
+        // 3) 入库
+        if (tasks.length > 0) {
+          batchAddTasks(ctx.sessionId, ctx.projectId, tasks).catch(err => {
+            console.error('[TaskParser] Failed to batch add tasks:', err);
+          });
         }
       }
     }

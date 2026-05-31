@@ -56,13 +56,14 @@
 
 ## 当前状态 → 目标状态
 
-| 维度 | 当前（Phase 1 完成后） | 目标 |
+| 维度 | 当前（Phase 3 起点） | 目标 |
 |---|---|---|
 | Agent 数量 | CodeWhale + Reasonix 双 Agent（适配器注册表） | 多 Agent 可扩展 |
 | Agent 调度 | 适配器模式 + AgentManager 统一管理 | 同一架构 |
 | 数据持久化 | SQLite sql.js + migration 机制 + agent_logs 表 | + 记忆系统（Phase 3） |
-| 前端 | App.vue 三栏面板 + Agent 选择器 + 模式选择器 | 组件化 + 状态管理（Phase 2） |
+| 前端 | App.vue 三栏面板 + Agent/模式选择器 + 任务面板 | 组件化 + 状态管理（Phase 3） |
 | 类型安全 | TypeScript（全部 electron/ 已迁移） | 同左 |
+| 多 Agent 协同 | PM 拆解 → 审批 → 并行执行 → 汇总验收（Phase 2） | 同上 + 推理气泡 + 记忆（Phase 3） |
 
 ---
 
@@ -70,6 +71,7 @@
 
 1. ✅ 目标已确定
 2. ✅ 架构设计（已产出 ARCHITECTURE.md、PROTOCOL.md 等 10 份文档）
-3. ✅ 分阶段实施计划（PHASE1.md + PHASE2.md）
+3. ✅ 分阶段实施计划（PHASE1.md + PHASE2.md + PHASE3.md）
 4. ✅ Phase 1 已完成（后端 TypeScript/IPC 拆分/适配器框架/双 CLI 改造）
-5. ✅ Phase 2 已完成（Mission 驱动协同 + 多 Agent 并行执行）
+5. ✅ Phase 2 已完成（Mission 驱动协同 + 多 Agent 并行执行 + 审批汇总）
+6. ⬜ Phase 3（推理气泡 + 长期记忆 + Session 回放 + MCP 工具注入）
