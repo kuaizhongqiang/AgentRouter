@@ -20,6 +20,7 @@ Sender (untrusted metadata):
 |---|---|---|
 | `label` | ✅ | 人看的名字，如 `"Reasonix"`、`"CodeWhale"` |
 | `id` | ✅ | 实例唯一标识，如 `"reasonix-pm-001"`、`"codewhale-003"` |
+| `user` | ❌ | 用户身份标识，多用户协作时使用 |
 
 ### Metadata 的作用
 
@@ -44,6 +45,30 @@ Sender (untrusted metadata):
   }
 }
 ```
+
+#### 带用户身份标记
+
+多用户协作时，标识是谁发起的操作：
+
+```json
+{
+  "label": "openclaw-control-ui",
+  "id": "openclaw-control-ui",
+  "user": {
+    "id": "xiao-a",
+    "name": "小A"
+  }
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `user.id` | 用户唯一标识，命令行 `agentrouter config set user.id "xiao-a"` 配置 |
+| `user.name` | 用户可读名称 |
+
+**注入方式**：平台自动从本地配置读取，用户无需手动注入。
+
+**原则**：用户身份只用于标识和路由，不用于权限控制（开源项目，简单配置即可）。
 
 #### 带上下文标记
 
