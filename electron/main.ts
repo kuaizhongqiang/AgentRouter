@@ -8,6 +8,7 @@
  * - Agent 管理器初始化
  */
 import path from 'path';
+import fs from 'fs';
 import { spawn } from 'child_process';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { getDatabase } from './database/index';
@@ -60,6 +61,24 @@ app.whenReady().then(async () => {
 
   // 注册所有 IPC 处理器
   registerAllHandlers(ipcMain, agentManager, mainWindow);
+
+  // Phase 6: 启动 MCP Server（为 CLI Agent 提供文件工具）
+  const mcpPath = path.join(__dirname, 'mcp', 'server.js');
+  if (fs.existsSync(mcpPath)) {
+    mcpServer = spawn('node', [mcpPath], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      detached: false,
+    });
+    mcpServer.stdout?.on('data', (chunk: Buffer) => {
+      console.log('[MCP]', chunk.toString().trim());
+    });
+    mcpServer.stderr?.on('data', (chunk: Buffer) => {
+      console.error('[MCP]', chunk.toString().trim());
+    });
+    console.log('[Main] MCP Server started');
+  } else {
+    console.warn('[Main] MCP Server not found at', mcpPath);
+  }
 
   // 发送就绪状态（延时确保前端监听器就位）
   mainWindow.webContents.on('did-finish-load', () => {
