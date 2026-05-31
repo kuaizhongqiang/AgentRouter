@@ -79,8 +79,12 @@ Agent 接入平台时，声明自己的能力说明书。
     "context_window": "超大 — 能一次读完整个项目",
     "cost": "极低 — 适合大篇幅分析任务",
     "model": "DeepSeek 推理系列"
+  },
+  "execution_model": {
+    "parallel_mode": "sub-agent",
+    "description": "单进程内多个子 Agent 并行推理",
+    "max_instances": 1
   }
-}
 ```
 
 ### CodeWhale
@@ -108,8 +112,12 @@ Agent 接入平台时，声明自己的能力说明书。
     "deepseek_integration": "深度整合 — 推理能力强",
     "cost": "低",
     "speed": "编码速度快"
+  },
+  "execution_model": {
+    "parallel_mode": "multi-process",
+    "description": "多进程并行，每个任务一个独立进程",
+    "max_instances": 4
   }
-}
 ```
 
 ### 未来 Agent X（示例）
@@ -130,7 +138,12 @@ Agent 接入平台时，声明自己的能力说明书。
   "not_for": [
     "复杂推理",
     "代码审查"
-  ]
+  ],
+  "execution_model": {
+    "parallel_mode": "single",
+    "description": "仅支持单实例串行执行",
+    "max_instances": 1
+  }
 }
 ```
 
@@ -167,6 +180,24 @@ Sender (untrusted metadata):
 └────────────────────────────────────────────┘
 ```
 
+### 消息头中的执行模型标记
+
+消息头不仅标明身份，还应携带该实例的执行模型信息，方便平台和 PM 做调度决策：
+
+```
+Sender (untrusted metadata):
+{
+  "label": "openclaw-control-ui",
+  "id": "openclaw-control-ui",
+  "execution": {
+    "instance_id": "codewhale-001",
+    "parallel_mode": "multi-process"
+  }
+}
+```
+
+这样消息流中的每条消息都自带两个信息：**我是谁** + **我这种 Agent 能不能并行**。
+
 ### Metadata 的作用
 
 | 作用 | 说明 |
@@ -180,42 +211,88 @@ Sender (untrusted metadata):
 
 ## PM 如何根据标签做智能指派
 
-### 指派流程
+### 两步决策：派给谁 + 派几个
+
+PM 的指派决策分为两步：
+
+```
+Step 1: 派给谁？
+  → 根据 best_for / not_for 匹配能力
+
+Step 2: 派几个？
+  → 根据 execution_model 决定并行度
+```
+
+**两条信息缺一不可。**
+
+### 完整指派流程
 
 ```
 PM 拿到需求："给项目加 RBAC"
   │
   ├── 查标签库
-  │   ├── Reasonix    → best_for: ["规划", "审查"]
-  │   └── CodeWhale   → best_for: ["编码", "实现"]
+  │   ├── Reasonix
+  │   │   ├── best_for: ["规划", "审查"]
+  │   │   └── execution: max_instances=1 → 只能串行
+  │   │
+  │   └── CodeWhale
+  │       ├── best_for: ["编码", "实现"]
+  │       └── execution: max_instances=4 → 可以并行 4 个
   │
-  ├── 匹配任务
-  │   ├── "设计 RBAC 数据库结构"   → tag: "架构设计"     → Reasonix
-  │   ├── "实现 roles 表"          → tag: "代码生成"     → CodeWhale
-  │   ├── "实现权限中间件"         → tag: "功能开发"     → CodeWhale
-  │   ├── "安全审查"              → tag: "安全审计"     → Reasonix
-  │   └── "汇总结果"              → tag: "方案评估"     → Reasonix
+  ├── 匹配任务（能力 + 并行度）
+  │   ├── "设计 RBAC 数据库结构"  → Reasonix（1个实例就够了）
+  │   ├── "实现 roles 表"         → CodeWhale
+  │   ├── "实现权限中间件"        → CodeWhale  ← 并行 3 个，都在 max 以内
+  │   ├── "实现 API 接口"         → CodeWhale
+  │   ├── "安全审查"             → Reasonix（等上面干完）
+  │   └── "汇总结果"             → Reasonix
   │
-  └── 产出任务列表
+  └── 产出任务列表 + 并行组
+```
+
+### 并行度决策示例
+
+```
+场景一：CodeWhale 任务 ≤ 4 个
+  → 全部并行，一步到位
+  → max_instances=4，没问题
+
+场景二：CodeWhale 任务 6 个
+  → 分两批：第一批 4 个并行，第二批 2 个
+  → 不超过 max_instances 限制
+
+场景三：Reasonix 任务多个
+  → 串行执行，因为它 max_instances=1
+  → PM 拆任务时就知道不能并行
 ```
 
 ### 为什么这么派
 
 ```
 任务："安全审查整段代码"
-  → Reasonix → 因为它 best_for 里有 "安全审计"
-               而且 context_window 大，能读完整项目
+  → Reasonix → best_for 里有 "安全审计"
+               而且 max_instances=1，串行没问题
 
-任务："写一个用户登录接口"
-  → CodeWhale → 因为它 best_for 里有 "代码生成"
-                 而且编码快，适合这种明确的小任务
+任务："写用户登录 + 注册 + 鉴权三个接口"
+  → CodeWhale × 3 → max_instances=4，可以并行
+                     PM 放心拆三个任务
 
-任务："评估用 RabbitMQ 还是 Kafka"
-  → Reasonix → 因为它 best_for 里有 "技术选型调研"
-               长上下文适合对比分析
+任务："全部代码做一次安全扫描"
+  → 不给 CodeWhale → not_for 里有 "安全审计"
+                      而且并行再多也不适合干这个
 ```
 
 ---
+
+## 三种并行模式的标签差异
+
+| 模式 | 代表 Agent | max_instances | PM 拆解策略 |
+|---|---|---|---|
+| **sub-agent** 🧩 | Reasonix | 1 | 只拆 1 个任务，任务内部的子任务由它自己并行 |
+| **multi-process** 🚀 | CodeWhale | 4 | 可拆多个任务并行，不超过 max_instances |
+| **single** 🐌 | 某些轻量 CLI | 1 | 只能串行，需要排队 |
+
+PM 拆任务时必须同时考虑这三者：**能力匹配 + 并行度 + 串行兜底**。
 
 ## Agent 接入规范
 
@@ -240,6 +317,11 @@ PM 拿到需求："给项目加 RBAC"
   "signature_features": {
     "feature_1": "描述",
     "feature_2": "描述"
+  },
+  "execution_model": {
+    "parallel_mode": "multi-process | sub-agent | single",
+    "description": "自然语言描述并行方式",
+    "max_instances": 4
   }
 }
 ```
@@ -252,6 +334,7 @@ PM 拿到需求："给项目加 RBAC"
 | `best_for` | ✅ | 至少 1 个，告诉 PM 你最适合干什么 |
 | `not_for` | ❌ | 可选，告诉 PM 别让你干什么 |
 | `signature_features` | ❌ | 可选，你的独门绝技 |
+| **`execution_model`** | ✅ | **并行模式 + 最大实例数**，PM 拆任务时必查 |
 
 ---
 
