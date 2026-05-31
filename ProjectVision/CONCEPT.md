@@ -25,6 +25,8 @@
 ║    ✅ 只做一件事：调度               ║
 ║       · 调用（Call）— spawn CLI     ║
 ║       · 维护（Maintain）— 记上下文   ║
+║       · 协调（Coordinate）— Agent间  ║
+║       · 调整（Adapt）— 动态改计划    ║
 ║                                      ║
 ╚══════════════════════════════════════╝
 ```
@@ -40,6 +42,53 @@
 | **任务（Task）** | 最小工作单元，有 assignee 和依赖 |
 | **会话（Session）** | 一次需求的完整生命周期 |
 | **项目（Project）** | 一个本地代码仓库 = 一个项目 |
+| **PM（规划Agent）** | 拆解需求、评估建议、动态调整任务 |
+| **Metadata（消息头）** | 每条消息的身份标识（谁在说话） |
+| **Suggestion（建议）** | Agent 向 PM 提出的协作建议 |
+| **标签（Tag）** | Agent 的能力说明书（擅长什么、能并行几个） |
+| **回收包（Handover）** | Agent 执行完成后传递给下游的上下文 |
+
+---
+
+## 核心机制
+
+### Metadata — 消息的身份标识
+
+**每条消息都带发送者身份。** 这是所有通信的基础。
+
+```
+Sender (untrusted metadata):
+{
+  "label": "openclaw-control-ui",
+  "id": "openclaw-control-ui"
+}
+```
+
+平台靠它知道：谁在说话、谁干了什么、下一步该找谁。
+
+### 标签 — Agent 的能力说明书
+
+每个 Agent 接入时声明自己的能力：
+
+```
+Reasonix  → 擅长规划审查，max_instances=1（子Agent并行）
+CodeWhale → 擅长编码实现，max_instances=4（多进程并行）
+```
+
+调度器和 PM 靠标签做两步决策：派给谁 + 派几个。
+
+### 动态调整 — 计划可以改
+
+任务不是一次拆完就固定的。执行过程中：
+
+```
+A 执行中发现："如果 B 在 beta 中加配置层会更科学"
+  → 向 PM 提 suggestion
+  → PM 评估 → 发出 task:update / task:add / task:cancel
+  → 调度器按新计划执行
+```
+
+**PM 是唯一的决策者。Agent 只能提建议，不能直接改任务。**
 
 ---
 
