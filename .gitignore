@@ -48,11 +48,20 @@ agents/codewhale/node_modules/
 agents/codewhale/target/
 agents/codewhale/release/
 agents/codewhale/npm/*/node_modules/
+agents/deepcode/node_modules/
+agents/deepcode/dist/
+agents/opencode/ar-opencode*
+agents/opencode/node_modules/
 
 # Runtime config
 .codewhale/
 .deepseek/
 .reasonix/
+.opencode/
+
+# Go / Rust installer downloads
+*.msi
+*.zip
 
 # Local project files (not in remote)
 AGENTS.md

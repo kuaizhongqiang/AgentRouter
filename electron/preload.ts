@@ -119,3 +119,14 @@ contextBridge.exposeInMainWorld('db', {
     ipcRenderer.invoke('db:addTaskDynamic', sessionId, projectId, title, assignee),
   cancelTask: (id: string) => ipcRenderer.invoke('db:cancelTask', id),
 });
+
+// ── Credentials API ──
+
+contextBridge.exposeInMainWorld('credentials', {
+  /** 读取统一凭证（apiKey + baseUrl） */
+  get: () => ipcRenderer.invoke('credentials:get'),
+
+  /** 保存统一凭证 */
+  set: (creds: { apiKey: string; baseUrl: string }) =>
+    ipcRenderer.invoke('credentials:set', creds),
+});

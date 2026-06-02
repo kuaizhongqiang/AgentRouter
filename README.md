@@ -18,7 +18,9 @@ AgentRouter/
 │   │   ├── sessions.ts        对话 CRUD
 │   │   ├── messages.ts        消息 CRUD
 │   │   ├── tasks.ts           任务 CRUD + 记忆 + 动态调整
-│   │   └── agents.ts          Agent 执行 IPC + suggestion 路由
+│   │   ├── agents.ts          Agent 执行 IPC + suggestion 路由
+│   │   └── credentials.ts     统一凭证 IPC（API Key / Base URL / 模型名）
+│   ├── credentials.ts          统一凭证管理（读写 ~/.agentrouter/credentials.json）
 │   ├── database/              数据层
 │   │   ├── index.ts            SQLite 初始化 (sql.js)
 │   │   ├── migrations.ts       Schema 迁移 (v1-v4)
@@ -28,7 +30,9 @@ AgentRouter/
 │   │   ├── manager.ts          AgentManager (+ _sender 注入 + PM 生命周期)
 │   │   ├── task-parser.ts      任务块解析器（PM 拆解 + context）
 │   │   ├── codewhale.ts        CodeWhale 适配器 (+ manifest)
-│   │   └── reasonix.ts         Reasonix 适配器 (+ manifest)
+│   │   ├── reasonix.ts         Reasonix 适配器 (+ manifest)
+│   │   ├── deepcode.ts         Deep Code CLI 适配器
+│   │   └── opencode.ts         OpenCode 适配器
 │   ├── scheduler/              调度引擎 (Phase 4-5)
 │   │   ├── executor.ts         并行执行 + 冲突检测 + 信号量
 │   │   └── pm-lifecycle.ts     PM 生命周期 + suggestion 路由
@@ -51,8 +55,10 @@ AgentRouter/
 │   ├── smoke-test.mjs          端到端冒烟测试
 │   └── runtime-test-2.mjs      Phase 3-6 运行时集成测试（100 项）
 ├── agents/                    Fork 的开源 CLI 源码
-│   ├── reasonix/              DeepSeek-Reasonix (MIT, v0.52.0)
-│   └── codewhale/             CodeWhale (MIT, v0.8.46)
+│   ├── codewhale/             CodeWhale — Rust (MIT, v0.8.46)
+│   ├── deepcode/              Deep Code CLI — TypeScript (MIT, v0.1.27)
+│   ├── opencode/              OpenCode — Go (Apache-2.0)
+│   └── reasonix/              DeepSeek-Reasonix — TypeScript (MIT, v0.52.0)
 └── package.json
 ```
 
@@ -64,7 +70,7 @@ AgentRouter/
 |---|---|---|
 | **项目管理** | ✅ | 绑定本地路径，多仓库 |
 | **对话/消息** | ✅ | 多标签页，SQLite 持久化 |
-| **单 Agent 执行** | ✅ | 默认 CodeWhale，支持 Reasonix |
+| **单 Agent 执行** | ✅ | 四个 Agent 可选：CodeWhale / Reasonix / Deep Code / OpenCode |
 | **Agent 选择器 + 标签** | ✅ Phase 3 | 下拉选择 + tagline 工具提示 |
 | **`_sender` 消息身份** | ✅ Phase 3 | 每条事件带 `{label, id}` 标识 |
 | **PM 任务拆解** | ✅ Phase 2 | Reasonix 担任 PM，产出结构化任务列表 |
@@ -77,8 +83,11 @@ AgentRouter/
 | **长期记忆系统** | ✅ Phase 6 | memories 表 + CRUD IPC + preload 全链路 |
 | **Session 回放** | ✅ Phase 6 | 读取 .jsonl 事件文件按时间戳回放 |
 | **MCP 工具注入** | ✅ Phase 6 | 自动启动 MCP Server（file.read/write/search）|
-| **Reasonix 集成** | ✅ | `platform` 子命令 + `--role pm` |
-| **CodeWhale 集成** | ✅ | `--platform-mode` 参数 |
+| **统一凭证管理** | ✅ | 一次配置 API Key/Base URL/模型，所有 Agent 共享 |
+| **Deep Code 集成** | ✅ | `platform exec` 子命令 + NDJSON 事件流 |
+| **OpenCode 集成** | ✅ | `platform exec` 子命令 + reasoning 气泡支持 |
+| **CodeWhale 集成** | ✅ | `--platform-mode` 参数 + `--role pm` |
+| **Reasonix 集成** | ✅ | `platform` 子命令 + `--role pm` + reasoning 气泡 |
 
 ---
 
@@ -165,13 +174,25 @@ release/
 ### 构建 CLI Agent
 
 ```bash
-# CodeWhale (Rust, 需要 MinGW-w64 或 VS Build Tools)
+# CodeWhale (Rust, 需要 Rust 1.88+)
 cd agents/codewhale
 cargo build --release -p codewhale-cli -p codewhale-tui
 
 # Reasonix (Node.js)
 cd agents/reasonix
 npm run build
+
+# Deep Code CLI (Node.js)
+cd agents/deepcode
+npm install
+npm run build
+
+# OpenCode (Go, 需要 Go 1.24+)
+cd agents/opencode
+go build -o ar-opencode.exe .
+
+# 或一键构建所有 Agent：
+build.bat
 ```
 
 ---
@@ -179,6 +200,8 @@ npm run build
 ## 数据存储
 
 `~/.agentrouter/agentrouter.db` — SQLite 数据库 (sql.js WASM 引擎)，包含 `projects`、`sessions`、`messages`、`tasks`、`agent_logs`、`memories` 表。
+
+`~/.agentrouter/credentials.json` — 统一凭证文件（API Key / Base URL），所有 Agent 共享。
 
 Agent 执行日志输出到 `~/.agentrouter/projects/<id>/sessions/<id>/events/`（JSON Lines 格式）
 
@@ -202,5 +225,7 @@ AgentRouter 集成了以下开源项目的修改版本，所有改动仅限于 I
 |---|---|---|---|
 | CodeWhale | https://github.com/CodeWhaleTeam/codewhale | MIT | v0.8.46 |
 | DeepSeek-Reasonix | https://github.com/esengine/DeepSeek-Reasonix | MIT | v0.52.0 |
+| Deep Code CLI | https://github.com/lessweb/deepcode-cli | MIT | v0.1.27 |
+| OpenCode | https://github.com/opencode-ai/opencode | Apache-2.0 | latest |
 
 各项目的完整许可证文本见对应 `agents/{project}/LICENSE` 文件。改动记录见各项目目录下的 `FORK.md`。

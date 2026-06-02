@@ -14,6 +14,7 @@ import os from 'os';
 import type { BrowserWindow } from 'electron';
 import type { AgentAdapter, AgentEvent, AgentExecOptions, SenderMetadata } from './adapter';
 import type { AgentLog } from '../types';
+import { getCredentialsEnv } from '../credentials';
 
 export class AgentManager {
   private adapters = new Map<string, AgentAdapter>();
@@ -132,13 +133,23 @@ export class AgentManager {
     if (mode) execOptions.mode = mode;
     if (context) {
       execOptions.context = context;
-      // 通过环境变量注入上下文
       execOptions.env = { ...process.env, AGENTROUTER_CONTEXT: JSON.stringify(context) };
+    }
+    // 注入统一凭证环境变量（覆盖各 CLI 对应的变量名）
+    const credentialsEnv = getCredentialsEnv();
+    if (Object.keys(credentialsEnv).length > 0) {
+      execOptions.env = {
+        ...process.env,
+        ...(execOptions.env ?? {}),
+        ...credentialsEnv,
+      };
     }
     const proc = adapter.spawnExec(command, execOptions);
 
     // Phase 5: 追踪 PM 进程（用于 suggestion 路由）
-    const isPm = mode === 'PM 拆解' && agentName === 'reasonix';
+    // 通过 manifest.capabilities.can_suggest 判断是否为 PM Agent
+    const manifest = adapter.manifest();
+    const isPm = mode === 'PM 拆解' && !!(manifest.capabilities?.can_suggest);
     if (isPm) {
       this.pmProcesses.set(sessionId, { agentName, proc });
       console.log(`[PM] Registered PM process for session ${sessionId}`);
@@ -200,10 +211,9 @@ export class AgentManager {
       }
     });
 
-    // stderr 作为原始输出转发
+    // stderr — 只打印到控制台，不转发到前端（避免日志/警告污染气泡）
     proc.stderr?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString();
-      this.sendToRenderer('agent:output', { agent: agentName, raw: text, event: null });
+      console.log(`[${agentName} stderr]`, chunk.toString().trim());
     });
 
     // 记录进程

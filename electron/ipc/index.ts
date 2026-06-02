@@ -8,6 +8,7 @@ import { registerSessionHandlers } from './sessions';
 import { registerMessageHandlers } from './messages';
 import { registerTaskHandlers } from './tasks';
 import { registerAgentHandlers } from './agents';
+import { registerCredentialsHandlers } from './credentials';
 
 export function registerAllHandlers(
   ipcMain: IpcMain,
@@ -19,4 +20,5 @@ export function registerAllHandlers(
   registerMessageHandlers(ipcMain);
   registerTaskHandlers(ipcMain);
   registerAgentHandlers(ipcMain, manager, mainWindow);
+  registerCredentialsHandlers(ipcMain);
 }

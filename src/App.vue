@@ -29,6 +29,20 @@
           </div>
         </div>
       </div>
+
+      <!-- ═══ 凭证设置 ═══ -->
+      <div class="sidebar-section">
+        <div class="sidebar-title" @click="showCredentials = !showCredentials" style="cursor:pointer">
+          <span>{{ showCredentials ? '▾' : '▸' }} 凭证</span>
+          <span v-if="hasCredentials" class="dot online" style="width:6px;height:6px;display:inline-block"></span>
+        </div>
+        <div v-if="showCredentials" class="credentials-form">
+          <input v-model="credApiKey" type="password" placeholder="API Key (sk-...)" class="cred-input" />
+          <input v-model="credBaseUrl" placeholder="Base URL (https://...)" class="cred-input" />
+          <button @click="saveCredentials" class="btn-mini cred-save">保存</button>
+          <span v-if="credSaved" class="cred-saved-hint">✓ 已保存</span>
+        </div>
+      </div>
     </aside>
 
     <!-- ═══ 中间：对话区 ═══ -->
@@ -66,7 +80,7 @@
         <div v-for="m in messages" :key="m.id" class="msg" :class="m.role">
           <div class="msg-role">
             <template v-if="m.role === 'agent'">
-              <span class="agent-badge" :class="'agent-' + (m.agentName || selectedAgent || 'codewhale').toLowerCase()">{{ m.agentName || selectedAgent || 'CodeWhale' }}</span>
+              <span class="agent-badge" :class="'agent-' + (m.agentName || selectedAgent || 'unknown').toLowerCase()">{{ m.agentName || selectedAgent || 'Agent' }}</span>
               <span v-if="m.senderId" class="sender-id">{{ m.senderId }}</span>
             </template>
             <template v-else-if="m.role === 'reasoning'">
@@ -154,6 +168,32 @@ const newProjectName = ref('')
 const newProjectPath = ref('')
 const msgRef = ref(null)
 
+// ── 凭证状态 ──
+const credentials = window.credentials || { get: () => ({ apiKey: '', baseUrl: '' }), set: () => {} }
+const showCredentials = ref(false)
+const credApiKey = ref('')
+const credBaseUrl = ref('https://api.deepseek.com')
+const credSaved = ref(false)
+const hasCredentials = ref(false)
+
+async function loadCredentials() {
+  try {
+    const c = await credentials.get()
+    credApiKey.value = c.apiKey || ''
+    credBaseUrl.value = c.baseUrl || 'https://api.deepseek.com'
+    hasCredentials.value = !!c.apiKey
+  } catch (_) { /* preload not available in dev */ }
+}
+
+async function saveCredentials() {
+  try {
+    await credentials.set({ apiKey: credApiKey.value, baseUrl: credBaseUrl.value })
+    hasCredentials.value = !!credApiKey.value
+    credSaved.value = true
+    setTimeout(() => { credSaved.value = false }, 2000)
+  } catch (_) { /* preload not available */ }
+}
+
 // ── Mission 模式状态 ──
 const expandedTask = ref(null)
 const taskLogs = ref({})
@@ -168,12 +208,13 @@ const selectedAgent = ref(null)
 const selectedMode = ref('对话')
 const modes = ['对话', 'PM 拆解', 'YOLO', '审批', '逐步', '预览']
 
-// PM 拆解模式自动切换到 Reasonix
+// PM 拆解模式自动切换到有 can_suggest 能力的 Agent
 watch(selectedMode, (newMode) => {
   if (newMode === 'PM 拆解') {
-    const reasonix = agents.value.find(a => a.name === 'reasonix')
-    if (reasonix) {
-      selectedAgent.value = 'reasonix'
+    // 优先选 manifest 中声明 can_suggest 的 agent
+    const pmAgent = agents.value.find(a => a.manifest?.capabilities?.can_suggest)
+    if (pmAgent) {
+      selectedAgent.value = pmAgent.name
     }
   }
 })
@@ -285,7 +326,7 @@ async function send() {
   const cleanup = agent.onOutput((data) => {
     // data = { agent, event } | { agent, raw }
     const isReasoning = data?.event?.data?.channel === 'reasoning'
-    const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
+    const text = data?.event?.data?.message || data?.event?.data?.content || data?.event?.data?.error || data?.raw || ''
     // Phase 3: 捕获 _sender 身份标识
     if (data?.event?._sender?.id) {
       senderId = data.event._sender.id
@@ -433,7 +474,7 @@ async function executeAllTasks() {
       semaphore.run(async () => {
         const agentName = task.assignee || selectedAgent.value
         const cleanup = agent.onOutput((data) => {
-          const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
+          const text = data?.event?.data?.message || data?.event?.data?.content || data?.event?.data?.error || data?.raw || ''
           if (data?.event?.event === 'suggestion') showSuggestion.value = true
           if (text) {
             taskLogs.value[task.id] = (taskLogs.value[task.id] || '') + text
@@ -512,12 +553,13 @@ async function summarizeMission() {
   await db.addMessage(currentSession.value.id, 'user', msg)
   messages.value.push({ id: 'tmp', role: 'user', content: msg, timestamp: Date.now() })
 
-  // 调用 Reasonix PM 汇总任务执行结果
+   // 调用 PM Agent 汇总任务执行结果（选 can_suggest 的 agent，默认 reasonix）
+  const pmAgentName = agents.value.find(a => a.manifest?.capabilities?.can_suggest)?.name || 'reasonix'
   let reply = ''
   let done = false
   let senderId = ''
   const cleanup = agent.onOutput((data) => {
-    const text = data?.event?.data?.message || data?.event?.data?.content || data?.raw || ''
+    const text = data?.event?.data?.message || data?.event?.data?.content || data?.event?.data?.error || data?.raw || ''
     if (data?.event?._sender?.id) senderId = data.event._sender.id
     if (text) {
       reply += text
@@ -526,7 +568,7 @@ async function summarizeMission() {
         last.content = reply
         if (senderId) last.senderId = senderId
       } else {
-        messages.value.push({ id: 'tmp', role: 'agent', agentName: 'reasonix', content: reply, timestamp: Date.now() })
+        messages.value.push({ id: 'tmp', role: 'agent', agentName: pmAgentName, content: reply, timestamp: Date.now() })
       }
     }
     if (data?.event?.event === 'completion' || data?.event?.event === 'error') {
@@ -534,7 +576,7 @@ async function summarizeMission() {
     }
   })
   try {
-    await agent.exec('reasonix', msg, currentSession.value.id, currentProject.value.id, '对话')
+    await agent.exec(pmAgentName, msg, currentSession.value.id, currentProject.value.id, '对话')
   } catch (err) {
     reply += `\n[错误] ${err.message || err}`
     done = true
@@ -552,6 +594,7 @@ async function summarizeMission() {
 
 onMounted(async () => {
   await loadProjects()
+  await loadCredentials()
   if (agent) {
     agent.onStatus((s) => {
       const st = typeof s === 'string' ? s : s.status || 'offline'
@@ -829,4 +872,16 @@ body {
   background: #1a1a2e; color: #e0e0e0; cursor: pointer;
 }
 .dialog-actions button.primary { background: #e94560; border-color: #e94560; color: #fff; }
+
+/* ── 凭证表单 ── */
+.sidebar-section { border-top: 1px solid #0f3460; }
+.credentials-form { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.cred-input {
+  width: 100%; padding: 6px 8px; border: 1px solid #0f3460;
+  border-radius: 4px; background: #1a1a2e; color: #e0e0e0;
+  font-size: 12px; outline: none;
+}
+.cred-input:focus { border-color: #e94560; }
+.cred-save { align-self: flex-start; }
+.cred-saved-hint { color: #4caf50; font-size: 11px; }
 </style>
