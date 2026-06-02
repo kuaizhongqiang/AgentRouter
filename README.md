@@ -32,7 +32,9 @@ AgentRouter/
 │   │   ├── codewhale.ts        CodeWhale 适配器 (+ manifest)
 │   │   ├── reasonix.ts         Reasonix 适配器 (+ manifest)
 │   │   ├── deepcode.ts         Deep Code CLI 适配器
-│   │   └── opencode.ts         OpenCode 适配器
+│   │   ├── opencode.ts         OpenCode 适配器
+│   │   ├── cline.ts            Cline 适配器 (npm @cline/cli 包装层)
+│   │   └── continue.ts         Continue 适配器 (npm @continuedev/cli 包装层)
 │   ├── scheduler/              调度引擎 (Phase 4-5)
 │   │   ├── executor.ts         并行执行 + 冲突检测 + 信号量
 │   │   └── pm-lifecycle.ts     PM 生命周期 + suggestion 路由
@@ -58,7 +60,9 @@ AgentRouter/
 │   ├── codewhale/             CodeWhale — Rust (MIT, v0.8.46)
 │   ├── deepcode/              Deep Code CLI — TypeScript (MIT, v0.1.27)
 │   ├── opencode/              OpenCode — Go (Apache-2.0)
-│   └── reasonix/              DeepSeek-Reasonix — TypeScript (MIT, v0.52.0)
+│   ├── reasonix/              DeepSeek-Reasonix — TypeScript (MIT, v0.52.0)
+│   ├── cline/                 Cline — npm 二进制 (Apache-2.0, 包装层集成)
+│   └── continue/              Continue — npm 二进制 (Apache-2.0, 包装层集成)
 └── package.json
 ```
 
@@ -70,7 +74,7 @@ AgentRouter/
 |---|---|---|
 | **项目管理** | ✅ | 绑定本地路径，多仓库 |
 | **对话/消息** | ✅ | 多标签页，SQLite 持久化 |
-| **单 Agent 执行** | ✅ | 四个 Agent 可选：CodeWhale / Reasonix / Deep Code / OpenCode |
+| **单 Agent 执行** | ✅ | 六个 Agent 可选：CodeWhale / Reasonix / Deep Code / OpenCode / Cline / Continue |
 | **Agent 选择器 + 标签** | ✅ Phase 3 | 下拉选择 + tagline 工具提示 |
 | **`_sender` 消息身份** | ✅ Phase 3 | 每条事件带 `{label, id}` 标识 |
 | **PM 任务拆解** | ✅ Phase 2 | Reasonix 担任 PM，产出结构化任务列表 |
@@ -88,6 +92,8 @@ AgentRouter/
 | **OpenCode 集成** | ✅ | `platform exec` 子命令 + reasoning 气泡支持 |
 | **CodeWhale 集成** | ✅ | `--platform-mode` 参数 + `--role pm` |
 | **Reasonix 集成** | ✅ | `platform` 子命令 + `--role pm` + reasoning 气泡 |
+| **Cline 集成** | ✅ | npm 二进制调用 + `platform.cjs` 包装层 + `--json --yolo` 输出转译 |
+| **Continue 集成** | ✅ | npm 二进制调用 + `platform.cjs` 包装层 + `-p --format json` 转译 |
 
 ---
 
@@ -191,6 +197,12 @@ npm run build
 cd agents/opencode
 go build -o ar-opencode.exe .
 
+# Cline (npm 预编译二进制，无需本地编译)
+npm install -g @cline/cli
+
+# Continue (npm 预编译二进制，无需本地编译)
+npm install -g @continuedev/cli
+
 # 或一键构建所有 Agent：
 build.bat
 ```
@@ -219,13 +231,15 @@ Agent 记忆存储在同目录的 `memories` 表中，按项目+Agent 名索引�
 
 ## 使用的开源项目
 
-AgentRouter 集成了以下开源项目的修改版本，所有改动仅限于 I/O 接口层：
+AgentRouter 集成了以下开源项目。其中 CodeWhale / Reasonix / Deep Code / OpenCode 为源码 Fork（改动仅限于 I/O 接口层），Cline / Continue 通过包装层集成（不触及源码）：
 
-| 项目 | 原仓库 | 许可证 | Fork 版本 |
-|---|---|---|---|
-| CodeWhale | https://github.com/CodeWhaleTeam/codewhale | MIT | v0.8.46 |
-| DeepSeek-Reasonix | https://github.com/esengine/DeepSeek-Reasonix | MIT | v0.52.0 |
-| Deep Code CLI | https://github.com/lessweb/deepcode-cli | MIT | v0.1.27 |
-| OpenCode | https://github.com/opencode-ai/opencode | Apache-2.0 | latest |
+| 项目 | 原仓库 | 许可证 | 版本 | 集成方式 |
+| --- | --- | --- | --- | --- |
+| CodeWhale | <https://github.com/CodeWhaleTeam/codewhale> | MIT | v0.8.46 | 源码 Fork + `--platform-mode` |
+| DeepSeek-Reasonix | <https://github.com/esengine/DeepSeek-Reasonix> | MIT | v0.52.0 | 源码 Fork + `platform` 子命令 |
+| Deep Code CLI | <https://github.com/lessweb/deepcode-cli> | MIT | v0.1.27 | 源码 Fork + `platform` 子命令 |
+| OpenCode | <https://github.com/opencode-ai/opencode> | Apache-2.0 | latest | 源码 Fork + `platform` 子命令 |
+| Cline | <https://github.com/cline/cline> | Apache-2.0 | v2.13.0 | 包装层 `platform.cjs` + npm 二进制 |
+| Continue | <https://github.com/continuedev/continue> | Apache-2.0 | v1.5.45 | 包装层 `platform.cjs` + npm 二进制 |
 
-各项目的完整许可证文本见对应 `agents/{project}/LICENSE` 文件。改动记录见各项目目录下的 `FORK.md`。
+各项目的完整许可证文本见对应 `agents/{project}/LICENSE` 文件。改动/集成记录见各项目目录下的 `FORK.md`。

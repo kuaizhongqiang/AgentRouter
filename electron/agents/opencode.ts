@@ -23,9 +23,9 @@ export class OpenCodeAdapter implements AgentAdapter {
   manifest(): AgentManifest {
     return {
       identity: { id: 'ar-opencode', label: 'OpenCode', version: '0.1.0' },
-      tagline: '多模型通用终端编码助手',
-      best_for: ['多模型编码（OpenAI/Claude/Gemini）', '终端交互', 'LSP 集成'],
-      not_for: ['DeepSeek 特有推理优化'],
+      tagline: '多模型通用编码助手，终端交互与 LSP 集成',
+      best_for: ['LSP 感知代码重构', '多模型编码（OpenAI/Claude/Gemini）', '终端交互操作', '跨语言重构'],
+      not_for: ['DeepSeek 特有推理优化', '大规模并行编码', '复杂多步骤自主任务'],
       execution_model: { parallel_mode: 'single', max_instances: 2 },
       context_budget: { preferred_read_mode: 'incremental', context_window: '64K' },
       capabilities: { can_suggest: false },

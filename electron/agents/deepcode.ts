@@ -20,9 +20,9 @@ export class DeepCodeAdapter implements AgentAdapter {
   manifest(): AgentManifest {
     return {
       identity: { id: 'ar-deepcode', label: 'Deep Code', version: '0.1.27' },
-      tagline: '深度推理编码助手，专为 DeepSeek-V4 优化',
-      best_for: ['DeepSeek 深度思考编码', '推理强度可调开发', 'MCP 工具集成', 'Agent Skills'],
-      not_for: ['多模型切换', '跨平台代码审查'],
+      tagline: '深度推理编码专家，推理强度可调，DeepSeek-V4 优化',
+      best_for: ['复杂算法实现', '深度思考推理编码', '推理强度可调开发', 'MCP 工具集成', 'Agent Skills'],
+      not_for: ['多模型切换', '跨平台代码审查', '大规模并行编码'],
       execution_model: { parallel_mode: 'single', max_instances: 2 },
       context_budget: { preferred_read_mode: 'incremental', context_window: '128K' },
     };

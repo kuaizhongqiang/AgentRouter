@@ -87,5 +87,18 @@ export function getCredentialsEnv(): Record<string, string> {
     DEEPCODE_MODEL: 'deepseek-v4-flash',
     DEEPCODE_THINKING_ENABLED: 'true',
     DEEPCODE_REASONING_EFFORT: 'max',
+
+    // Cline — 注入通用 + 专用变量
+    CLINE_MODEL: 'openai/gpt-4o',
+    ANTHROPIC_API_KEY: apiKey,
+    ANTHROPIC_BASE_URL: baseUrl,
+
+    // Continue — 通过 AGENTROUTER_ 前缀统一注入
+    CONTINUE_MODEL: 'deepseek/deepseek-chat',
+
+    // 统一凭证（wrapper 层使用）
+    AGENTROUTER_API_KEY: apiKey,
+    AGENTROUTER_BASE_URL: baseUrl,
+    AGENTROUTER_MODEL: 'deepseek-v4-flash',
   };
 }

@@ -18,6 +18,8 @@ import { CodeWhaleAdapter } from './agents/codewhale';
 import { ReasonixAdapter } from './agents/reasonix';
 import { DeepCodeAdapter } from './agents/deepcode';
 import { OpenCodeAdapter } from './agents/opencode';
+import { ClineAdapter } from './agents/cline';
+import { ContinueAdapter } from './agents/continue';
 import { registerAllHandlers } from './ipc/index';
 
 let mainWindow: BrowserWindow | null = null;
@@ -62,6 +64,8 @@ app.whenReady().then(async () => {
   agentManager.register(new ReasonixAdapter());
   agentManager.register(new DeepCodeAdapter());
   agentManager.register(new OpenCodeAdapter());
+  agentManager.register(new ClineAdapter());
+  agentManager.register(new ContinueAdapter());
 
   // 注册所有 IPC 处理器
   registerAllHandlers(ipcMain, agentManager, mainWindow);

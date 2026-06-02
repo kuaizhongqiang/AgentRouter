@@ -23,9 +23,9 @@ export class CodeWhaleAdapter implements AgentAdapter {
   manifest(): AgentManifest {
     return {
       identity: { id: 'ar-codewhale', label: 'CodeWhale', version: '0.8.46' },
-      tagline: 'DeepSeek 深度整合，推理型编码小能手',
-      best_for: ['代码生成与实现', '功能模块开发', '代码重构', '单元测试'],
-      not_for: ['长上下文综合分析', '安全审计'],
+      tagline: '快速编码执行器，多进程并行高效实现',
+      best_for: ['快速功能模块开发', '代码生成与实现', '代码重构', '单元测试编写', 'Bug修复', '批量简单并行任务'],
+      not_for: ['长上下文综合分析', '安全审计', '复杂架构设计', '多步骤复杂自主任务'],
       execution_model: { parallel_mode: 'multi-process', max_instances: 4 },
       context_budget: { preferred_read_mode: 'incremental', context_window: '64K' },
     };
