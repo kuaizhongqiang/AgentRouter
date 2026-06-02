@@ -9,7 +9,7 @@ describe("isValidAnthropicApiKey", () => {
     expect(isValidAnthropicApiKey("sk-ant-abcdefghijklmnop")).toBe(true);
     expect(isValidAnthropicApiKey("sk-ant-test-key-with-dashes")).toBe(true);
     expect(
-      isValidAnthropicApiKey("sk-ant-api03_T3BlbkFJ1234567890abcdef"),
+      isValidAnthropicApiKey("sk-ant-test-A3BlbkFJ1234567890abcdef"),
     ).toBe(true);
   });
 
