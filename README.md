@@ -243,3 +243,16 @@ AgentRouter 集成了以下开源项目。其中 CodeWhale / Reasonix / Deep Cod
 | Continue | <https://github.com/continuedev/continue> | Apache-2.0 | v1.5.45 | 包装层 `platform.cjs` + npm 二进制 |
 
 各项目的完整许可证文本见对应 `agents/{project}/LICENSE` 文件。改动/集成记录见各项目目录下的 `FORK.md`。
+
+---
+
+## 代码仓库
+
+本项目同步托管于两个 Git 平台：
+
+| 平台 | 地址 |
+| --- | --- |
+| 🐙 **GitHub** | <https://github.com/kuaizhongqiang/AgentRouter> |
+| 🟢 **AtomGit** | <https://gitcode.com/m0_61563124/AgentRouter> |
+
+两个仓库始终保持同步，选择任意一个 clone 即可。
