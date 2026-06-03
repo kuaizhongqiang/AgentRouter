@@ -57,15 +57,17 @@ if exist "%USERPROFILE%\.workbuddy\binaries\node\versions\22.22.2\node.exe" (
 )
 
 if defined NODE_PATH (
-  "%NODE_PATH%" -e "process.exit(+(process.version.slice(1).split('.')[0])<18)" >nul 2>&1
-  if !errorlevel! neq 0 (
-    echo FAILED: %NODE_PATH% is too old
+  for /f %%a in ('"%NODE_PATH%" -v') do set "NODE_FULL_VER=%%a"
+  for /f "tokens=1 delims=." %%a in ("!NODE_FULL_VER!") do set "NODE_MAJOR=%%a"
+  set "NODE_MAJOR=!NODE_MAJOR:v=!"
+  if !NODE_MAJOR! LSS 18 (
+    echo FAILED: Node.js !NODE_FULL_VER! is too old, need ^>= v18
+    echo  Path: %NODE_PATH%
     echo  Install Node.js v18+ from https://nodejs.org/
     if "%CI_MODE%"=="1" exit /b 1
     pause & exit /b 1
   )
-  for /f %%a in ('"%NODE_PATH%" -v') do set "NODE_FULL_VER=%%a"
-  echo  [OK] %NODE_FULL_VER%
+  echo  [OK] !NODE_FULL_VER!
   echo  Path: %NODE_PATH%
   for %%F in ("%NODE_PATH%") do set "NODE_DIR=%%~dpF"
   set "PATH=!NODE_DIR!;%PATH%"
@@ -77,14 +79,15 @@ if defined NODE_PATH (
     if "%CI_MODE%"=="1" exit /b 1
     pause & exit /b 1
   )
-  node -e "process.exit(+(process.version.slice(1).split('.')[0])<18)" >nul 2>&1
-  if !errorlevel! neq 0 (
-    echo FAILED: Node.js in PATH is too old ^(v15^)
+  for /f %%a in ('node -v') do set "NODE_FULL_VER=%%a"
+  for /f "tokens=1 delims=." %%a in ("%NODE_FULL_VER%") do set "NODE_MAJOR=%%a"
+  set "NODE_MAJOR=%NODE_MAJOR:v=%"
+  if %NODE_MAJOR% LSS 18 (
+    echo FAILED: Node.js %NODE_FULL_VER% in PATH is too old, need ^>= v18
     echo  Install Node.js v18+ from https://nodejs.org/
     if "%CI_MODE%"=="1" exit /b 1
     pause & exit /b 1
   )
-  for /f %%a in ('node -v') do set "NODE_FULL_VER=%%a"
   echo  [OK] %NODE_FULL_VER% (from PATH)
 )
 
