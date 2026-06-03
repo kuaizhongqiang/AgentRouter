@@ -145,6 +145,7 @@ goto :step6
 REM --- Package ---
 :step6
 echo [7/7] Packaging app...
+set "ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/"
 for /f "tokens=2 delims=:," %%a in ('type package.json ^| findstr /C:"\"version\""') do set "VER=%%a"
 set "VER=%VER:"=%"
 set "VER=%VER: =%"
