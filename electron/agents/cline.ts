@@ -5,11 +5,11 @@
  * Cline CLI v2 (npm @cline/cli) 的包装层，将 --json 输出转译为 NDJSON 事件流
  */
 import { spawn } from 'child_process';
-import path from 'path';
 import type { ChildProcess, SpawnOptions } from 'child_process';
 import type { AgentAdapter, AgentExecOptions, AgentManifest } from './adapter';
+import { resolveAgentPath } from './paths';
 
-const WRAPPER = path.join(__dirname, '..', '..', 'agents', 'cline', 'platform.cjs');
+const WRAPPER = resolveAgentPath('cline', 'platform.cjs');
 
 export class ClineAdapter implements AgentAdapter {
   readonly name = 'cline';

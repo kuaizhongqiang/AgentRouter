@@ -160,6 +160,19 @@ if errorlevel 1 (
 )
 if exist "%OUTDIR%\win-unpacked\AgentRouter.exe" (
   echo  [OK] %OUTDIR%\win-unpacked\AgentRouter.exe
+  echo  Copying Agent binaries...
+  set "RESDIR=%OUTDIR%\win-unpacked\resources\agents"
+  if not exist "!RESDIR!\opencode" mkdir "!RESDIR!\opencode" 2>nul
+  if exist "agents\opencode\ar-opencode.exe" xcopy "agents\opencode\ar-opencode.exe" "!RESDIR!\opencode\" /y /q >nul
+  if not exist "!RESDIR!\reasonix\dist\cli" mkdir "!RESDIR!\reasonix\dist\cli" 2>nul
+  if exist "agents\reasonix\dist\cli\index.js" xcopy "agents\reasonix\dist\cli\*" "!RESDIR!\reasonix\dist\cli\" /y /q >nul 2>nul
+  if not exist "!RESDIR!\deepcode\dist" mkdir "!RESDIR!\deepcode\dist" 2>nul
+  if exist "agents\deepcode\dist\platform.js" xcopy "agents\deepcode\dist\*" "!RESDIR!\deepcode\dist\" /y /q >nul 2>nul
+  if not exist "!RESDIR!\cline" mkdir "!RESDIR!\cline" 2>nul
+  if exist "agents\cline\platform.cjs" xcopy "agents\cline\platform.cjs" "!RESDIR!\cline\" /y /q >nul
+  if not exist "!RESDIR!\continue" mkdir "!RESDIR!\continue" 2>nul
+  if exist "agents\continue\platform.cjs" xcopy "agents\continue\platform.cjs" "!RESDIR!\continue\" /y /q >nul
+  echo  [OK] Agent binaries copied
 )
 echo.
 goto :summary

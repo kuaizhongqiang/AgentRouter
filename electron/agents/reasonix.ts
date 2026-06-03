@@ -5,11 +5,11 @@
  * 并输出 NDJSON 格式的事件流
  */
 import { spawn } from 'child_process';
-import path from 'path';
 import type { ChildProcess, SpawnOptions } from 'child_process';
 import type { AgentAdapter, AgentExecOptions, AgentManifest } from './adapter';
+import { resolveAgentPath } from './paths';
 
-const CLI_ENTRY = path.join(__dirname, '..', '..', 'agents', 'reasonix', 'dist', 'cli', 'index.js');
+const CLI_ENTRY = resolveAgentPath('reasonix', 'dist', 'cli', 'index.js');
 
 export class ReasonixAdapter implements AgentAdapter {
   readonly name = 'reasonix';

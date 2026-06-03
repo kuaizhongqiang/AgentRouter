@@ -10,11 +10,9 @@ import { spawn } from 'child_process';
 import path from 'path';
 import type { ChildProcess, SpawnOptions } from 'child_process';
 import type { AgentAdapter, AgentExecOptions, AgentManifest } from './adapter';
+import { resolveAgentPath } from './paths';
 
-const BINARY = path.join(
-  __dirname, '..', '..', 'agents', 'opencode',
-  process.platform === 'win32' ? 'ar-opencode.exe' : 'ar-opencode'
-);
+const BINARY = resolveAgentPath('opencode', process.platform === 'win32' ? 'ar-opencode.exe' : 'ar-opencode');
 
 export class OpenCodeAdapter implements AgentAdapter {
   readonly name = 'opencode';

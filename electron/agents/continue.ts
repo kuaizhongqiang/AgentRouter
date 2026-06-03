@@ -5,11 +5,11 @@
  * Continue CLI (npm @continuedev/cli) 的包装层，将 headless JSON 输出转译为 NDJSON 事件流
  */
 import { spawn } from 'child_process';
-import path from 'path';
 import type { ChildProcess, SpawnOptions } from 'child_process';
 import type { AgentAdapter, AgentExecOptions, AgentManifest } from './adapter';
+import { resolveAgentPath } from './paths';
 
-const WRAPPER = path.join(__dirname, '..', '..', 'agents', 'continue', 'platform.cjs');
+const WRAPPER = resolveAgentPath('continue', 'platform.cjs');
 
 export class ContinueAdapter implements AgentAdapter {
   readonly name = 'continue';

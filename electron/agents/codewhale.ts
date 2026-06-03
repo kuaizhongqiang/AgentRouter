@@ -5,16 +5,13 @@
  * 并输出 NDJSON 格式的事件流
  */
 import { spawn } from 'child_process';
-import path from 'path';
 import type { ChildProcess, SpawnOptions } from 'child_process';
 import type { AgentAdapter, AgentExecOptions, AgentManifest } from './adapter';
+import { resolveAgentPath } from './paths';
 
 // 构建产物在 agents/codewhale/target/release/ 下
-// dist-electron/ 是编译输出目录，项目根在其上一级
-const BINARY = path.join(
-  __dirname, '..', '..', 'agents', 'codewhale', 'target', 'release',
-  process.platform === 'win32' ? 'ar-codewhale.exe' : 'ar-codewhale'
-);
+const BINARY = resolveAgentPath('codewhale', 'target', 'release',
+  process.platform === 'win32' ? 'ar-codewhale.exe' : 'ar-codewhale');
 
 export class CodeWhaleAdapter implements AgentAdapter {
   readonly name = 'codewhale';

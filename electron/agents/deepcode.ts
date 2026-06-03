@@ -5,13 +5,11 @@
  * 并输出 NDJSON 格式的事件流
  */
 import { spawn } from 'child_process';
-import path from 'path';
 import type { ChildProcess, SpawnOptions } from 'child_process';
 import type { AgentAdapter, AgentExecOptions, AgentManifest } from './adapter';
+import { resolveAgentPath } from './paths';
 
-const CLI_ENTRY = path.join(
-  __dirname, '..', '..', 'agents', 'deepcode', 'dist', 'platform.js'
-);
+const CLI_ENTRY = resolveAgentPath('deepcode', 'dist', 'platform.js');
 
 export class DeepCodeAdapter implements AgentAdapter {
   readonly name = 'deepcode';
