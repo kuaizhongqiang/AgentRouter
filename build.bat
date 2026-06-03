@@ -18,6 +18,13 @@ set "SKIP_FRONTEND=0"
 set "PORTABLE=0"
 set "CI_MODE=0"
 
+set "AGENT_CW_STATUS=──"
+set "AGENT_RX_STATUS=──"
+set "AGENT_DC_STATUS=──"
+set "AGENT_OC_STATUS=──"
+set "AGENT_CL_STATUS=──"
+set "AGENT_CN_STATUS=──"
+
 :parse_args
 if "%~1"=="--no-agent" set "BUILD_AGENT=0" & shift & goto parse_args
 if "%~1"=="--quick"    set "SKIP_FRONTEND=1" & shift & goto parse_args
@@ -107,12 +114,15 @@ if "%BUILD_AGENT%"=="1" (
       cargo build --release -p codewhale-cli -p codewhale-tui >> "%BUILD_LOG%" 2>&1
       if %errorlevel% neq 0 (
         echo  [WARN] CodeWhale build failed. Check build.log.
+        set "AGENT_CW_STATUS=⚠️"
       ) else (
         echo  [OK] CodeWhale
+        set "AGENT_CW_STATUS=✅"
       )
       popd
     ) else (
       echo  [SKIP] CodeWhale — Rust not found
+      set "AGENT_CW_STATUS=⛌"
     )
   )
   if exist "agents\reasonix\package.json" (
@@ -121,20 +131,24 @@ if "%BUILD_AGENT%"=="1" (
     call npm run build >> "%BUILD_LOG%" 2>&1
     if %errorlevel% neq 0 (
       echo  [WARN] Reasonix build failed. Check build.log.
+      set "AGENT_RX_STATUS=⚠️"
     ) else (
       echo  [OK] Reasonix
+      set "AGENT_RX_STATUS=✅"
     )
     popd
   )
   if exist "agents\deepcode\package.json" (
     echo  Building Deep Code CLI (Node.js)...
     pushd agents\deepcode
-    call npm install >> "%BUILD_LOG%" 2>&1
+    if not exist "node_modules" call npm install >> "%BUILD_LOG%" 2>&1
     call npm run build >> "%BUILD_LOG%" 2>&1
     if %errorlevel% neq 0 (
       echo  [WARN] Deep Code build failed. Check build.log.
+      set "AGENT_DC_STATUS=⚠️"
     ) else (
       echo  [OK] Deep Code CLI
+      set "AGENT_DC_STATUS=✅"
     )
     popd
   )
@@ -146,12 +160,37 @@ if "%BUILD_AGENT%"=="1" (
       go build -o ar-opencode.exe . >> "%BUILD_LOG%" 2>&1
       if %errorlevel% neq 0 (
         echo  [WARN] OpenCode build failed. Check build.log.
+        set "AGENT_OC_STATUS=⚠️"
       ) else (
         echo  [OK] OpenCode
+        set "AGENT_OC_STATUS=✅"
       )
       popd
     ) else (
       echo  [SKIP] OpenCode — Go not found
+      set "AGENT_OC_STATUS=⛌"
+    )
+  )
+  REM Cline — npm 预编译二进制，通过包装层集成
+  if exist "agents\cline\platform.cjs" (
+    where @cline/cli >nul 2>&1
+    if !errorlevel! equ 0 (
+      echo  [OK] Cline (npm global: @cline/cli)
+      set "AGENT_CL_STATUS=✅"
+    ) else (
+      echo  [INFO] Cline not installed globally. Run: npm install -g @cline/cli
+      set "AGENT_CL_STATUS=⛌"
+    )
+  )
+  REM Continue — npm 预编译二进制，通过包装层集成
+  if exist "agents\continue\platform.cjs" (
+    where @continuedev/cli >nul 2>&1
+    if !errorlevel! equ 0 (
+      echo  [OK] Continue (npm global: @continuedev/cli)
+      set "AGENT_CN_STATUS=✅"
+    ) else (
+      echo  [INFO] Continue not installed globally. Run: npm install -g @continuedev/cli
+      set "AGENT_CN_STATUS=⛌"
     )
   )
   echo  Done building agents
@@ -276,6 +315,17 @@ echo  Version:  %VER%
 echo  Duration: %ELAPSED_MIN%m %ELAPSED_SEC%s
 echo  Log:      %BUILD_LOG%
 echo.
+
+if "%BUILD_AGENT%"=="1" (
+  echo  Agent build status:
+  echo    CodeWhale   Rust     %AGENT_CW_STATUS%
+  echo    Reasonix    Node.js  %AGENT_RX_STATUS%
+  echo    Deep Code   Node.js  %AGENT_DC_STATUS%
+  echo    OpenCode    Go       %AGENT_OC_STATUS%
+  echo    Cline       npm      %AGENT_CL_STATUS%
+  echo    Continue    npm      %AGENT_CN_STATUS%
+  echo.
+)
 
 if "%PORTABLE%"=="1" (
   echo  Output: %OUTDIR%\AgentRouter Setup %VER%.exe
