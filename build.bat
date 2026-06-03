@@ -151,7 +151,14 @@ set "VER=%VER:"=%"
 set "VER=%VER: =%"
 set "VER=%VER:,=%"
 set "OUTDIR=release\AgentRouter-%VER%"
-if exist "%OUTDIR%" rmdir /s /q "%OUTDIR%" 2>nul
+
+REM Kill any running AgentRouter processes that may lock files
+taskkill /f /im AgentRouter.exe >nul 2>&1
+
+if exist "%OUTDIR%" (
+  echo  Removing previous build...
+  rmdir /s /q "%OUTDIR%" 2>nul
+)
 mkdir "%OUTDIR%" 2>nul
 call npx electron-builder --win --dir -c.directories.output=%OUTDIR% >> "%BUILD_LOG%" 2>&1
 if errorlevel 1 (
