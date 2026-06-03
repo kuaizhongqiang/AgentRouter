@@ -9,18 +9,12 @@
 ## 快速开始
 
 ```bash
-# 安装依赖
-npm install
-
-# 启动开发模式（Electron + Vite 联调）
-npm run dev
-
-# 构建生产版本
-npm run build
-build.bat          # 一键打包（产物: release/AgentRouter-{version}/win-unpacked/）
+npm install        # 安装依赖
+npm run dev        # 启动开发模式
+build.bat          # 一键构建生产包
 ```
 
-各 Agent CLI 的构建（Rust / Go / TypeScript / npm 预编译）见 `agents/` 下对应目录说明。
+详细的从零搭建指南（环境要求 / 凭证配置 / Agent 构建 / 首次使用）见 **[`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md)**。
 
 ---
 
