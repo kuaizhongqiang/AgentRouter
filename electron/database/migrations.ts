@@ -92,6 +92,61 @@ CREATE TABLE IF NOT EXISTS memories (
 CREATE INDEX IF NOT EXISTS idx_memories_project_agent ON memories(projectId, agentName);
 `;
 
+const SCHEMA_V5 = `
+-- M2: 任务模板表
+CREATE TABLE IF NOT EXISTS task_templates (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  tasks       TEXT NOT NULL DEFAULT '[]',
+  createdAt   TEXT NOT NULL,
+  updatedAt   TEXT NOT NULL
+);
+
+-- 预置 3 个模板（INSERT OR IGNORE 防止重复）
+INSERT OR IGNORE INTO task_templates (id, name, description, tasks, createdAt, updatedAt) VALUES
+(
+  'tpl-fix-bug',
+  '修复 Bug',
+  '标准 Bug 修复流程：复现、定位、修复、验证',
+  '[{"title":"复现 Bug","assignee":"","description":"确认 Bug 复现步骤和环境"},{"title":"定位根因","assignee":"","description":"分析代码定位问题根因"},{"title":"实现修复","assignee":"","description":"编写修复代码并自测"},{"title":"编写测试","assignee":"","description":"添加回归测试防止再次出现"},{"title":"Code Review","assignee":"","description":"提交 PR 并邀请同事审查"}]',
+  datetime('now'),
+  datetime('now')
+),
+(
+  'tpl-add-feature',
+  '添加功能',
+  '标准功能开发流程：需求分析、设计、实现、测试',
+  '[{"title":"需求分析","assignee":"","description":"明确功能需求和验收标准"},{"title":"技术设计","assignee":"","description":"编写技术方案和接口设计"},{"title":"实现功能","assignee":"","description":"编码实现核心逻辑"},{"title":"编写测试","assignee":"","description":"单元测试 + 集成测试"},{"title":"更新文档","assignee":"","description":"更新 README 和 API 文档"}]',
+  datetime('now'),
+  datetime('now')
+),
+(
+  'tpl-code-review',
+  '代码审查',
+  '标准 Code Review 流程：逐文件审查、问题记录、修复跟进',
+  '[{"title":"审查变更概览","assignee":"","description":"理解 PR 背景和变更范围"},{"title":"逐文件审查","assignee":"","description":"逐文件检查代码质量、安全性和性能"},{"title":"记录审查意见","assignee":"","description":"整理 Bug、改进建议和疑问"},{"title":"跟进修复","assignee":"","description":"确认所有审查意见已处理"}]',
+  datetime('now'),
+  datetime('now')
+);
+`;
+
+const SCHEMA_V6 = `
+-- M4 #8: Token 用量追踪表
+CREATE TABLE IF NOT EXISTS token_usage (
+  id              TEXT PRIMARY KEY,
+  sessionId       TEXT NOT NULL,
+  agentType       TEXT NOT NULL DEFAULT '',
+  promptTokens    INTEGER NOT NULL DEFAULT 0,
+  completionTokens INTEGER NOT NULL DEFAULT 0,
+  totalTokens     INTEGER NOT NULL DEFAULT 0,
+  model           TEXT NOT NULL DEFAULT '',
+  createdAt       TEXT NOT NULL,
+  FOREIGN KEY (sessionId) REFERENCES sessions(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_token_usage_session ON token_usage(sessionId);
+`;
+
 /**
  * 运行所有迁移
  */
@@ -134,6 +189,8 @@ export function runMigrations(db: Database): void {
     { id: 2, name: 'v2-agent-logs', sql: SCHEMA_V2 },
     { id: 3, name: 'v3-session-type-task-fields', sql: SCHEMA_V3 },
     { id: 4, name: 'v4-memories', sql: SCHEMA_V4 },
+    { id: 5, name: 'v5-task-templates', sql: SCHEMA_V5 },
+    { id: 6, name: 'v6-token-usage', sql: SCHEMA_V6 },
   ];
 
   for (const m of migrations) {

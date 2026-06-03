@@ -40,6 +40,9 @@ contextBridge.exposeInMainWorld('agent', {
   /** Phase 6: Session 回放 */
   replay: (sessionId: string, projectId: string) => ipcRenderer.invoke('agent:replay', sessionId, projectId),
 
+  /** M2: 获取斜杠命令列表 */
+  commands: () => ipcRenderer.invoke('agent:commands'),
+
   /**
    * 监听 Agent 输出事件
    * @returns 取消监听的函数
@@ -69,6 +72,8 @@ contextBridge.exposeInMainWorld('db', {
   createProject: (name: string, path: string) => ipcRenderer.invoke('db:createProject', name, path),
   removeProject: (id: string) => ipcRenderer.invoke('db:removeProject', id),
   getProject: (id: string) => ipcRenderer.invoke('db:getProject', id),
+  /** M3: 列出项目目录下的源文件 */
+  listSourceFiles: (projectPath: string) => ipcRenderer.invoke('project:listSourceFiles', projectPath),
 
   // 会话
   listSessions: (projectId: string) => ipcRenderer.invoke('db:listSessions', projectId),
@@ -118,6 +123,11 @@ contextBridge.exposeInMainWorld('db', {
   addTaskDynamic: (sessionId: string, projectId: string, title: string, assignee?: string) =>
     ipcRenderer.invoke('db:addTaskDynamic', sessionId, projectId, title, assignee),
   cancelTask: (id: string) => ipcRenderer.invoke('db:cancelTask', id),
+
+  // M4 #11: 项目级配置
+  getProjectConfig: (projectPath: string) => ipcRenderer.invoke('project:getConfig', projectPath),
+  setProjectConfig: (projectPath: string, config: unknown) =>
+    ipcRenderer.invoke('project:setConfig', projectPath, config),
 });
 
 // ── Credentials API ──
@@ -129,4 +139,33 @@ contextBridge.exposeInMainWorld('credentials', {
   /** 保存统一凭证 */
   set: (creds: { apiKey: string; baseUrl: string }) =>
     ipcRenderer.invoke('credentials:set', creds),
+});
+
+// ── Notification API (Issue #9) ──
+
+contextBridge.exposeInMainWorld('notification', {
+  send: (title: string, body: string) => ipcRenderer.invoke('notification:send', { title, body }),
+});
+
+// ── Task Template API (M2) ──
+
+contextBridge.exposeInMainWorld('taskTemplate', {
+  list: () => ipcRenderer.invoke('task-template:list'),
+  create: (name: string, description: string, tasks: string) =>
+    ipcRenderer.invoke('task-template:create', name, description, tasks),
+  delete: (id: string) => ipcRenderer.invoke('task-template:delete', id),
+});
+
+// ── Replay API (M2: Issue #20) ──
+
+contextBridge.exposeInMainWorld('replay', {
+  getMessages: (sessionId: string) => ipcRenderer.invoke('replay:getMessages', sessionId),
+});
+
+// ── Token API (M4 #8) ──
+
+contextBridge.exposeInMainWorld('token', {
+  record: (sessionId: string, agentType: string, promptTokens: number, completionTokens: number, model: string) =>
+    ipcRenderer.invoke('token:record', sessionId, agentType, promptTokens, completionTokens, model),
+  getUsage: (sessionId: string) => ipcRenderer.invoke('token:getUsage', sessionId),
 });

@@ -66,4 +66,17 @@ export function registerTaskHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('db:cancelTask', async (_e, id: string) => {
     return repo.archiveTask(id);
   });
+
+  // M2: 任务模板 CRUD
+  ipcMain.handle('task-template:list', async () => {
+    return repo.getTaskTemplates();
+  });
+
+  ipcMain.handle('task-template:create', async (_e, name: string, description: string, tasks: string) => {
+    return repo.createTaskTemplate(name, description, tasks);
+  });
+
+  ipcMain.handle('task-template:delete', async (_e, id: string) => {
+    return repo.deleteTaskTemplate(id);
+  });
 }

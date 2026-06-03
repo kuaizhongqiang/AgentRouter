@@ -67,3 +67,6 @@ agents/opencode/node_modules/
 AGENTS.md
 CODEBUDDY.md
 REASONIX.md
+
+# WorkBuddy metadata
+.workbuddy/

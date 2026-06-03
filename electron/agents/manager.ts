@@ -28,6 +28,24 @@ export class AgentManager {
   /** Phase 5: 会话 → PM 进程映射（用于 suggestion 路由） */
   private pmProcesses = new Map<string, { agentName: string; proc: import('child_process').ChildProcess }>();
 
+  // ── M4 #16: Agent 数据目录 ──
+
+  /** 获取 Agent 统一数据目录 (~/.agentrouter/agents/{name}/) */
+  static getAgentDataDir(agentName: string): string {
+    return path.join(os.homedir(), '.agentrouter', 'agents', agentName);
+  }
+
+  /** 确保所有已注册 Agent 的数据目录存在 */
+  ensureAgentDataDirs(): void {
+    for (const name of this.adapters.keys()) {
+      const dir = AgentManager.getAgentDataDir(name);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`[AgentDir] Created data directory for "${name}": ${dir}`);
+      }
+    }
+  }
+
   constructor(mainWindow?: BrowserWindow) {
     if (mainWindow) {
       this.mainWindow = mainWindow;
@@ -144,6 +162,13 @@ export class AgentManager {
         ...credentialsEnv,
       };
     }
+    // M4 #16: 注入 Agent 统一数据目录
+    const dataDir = AgentManager.getAgentDataDir(agentName);
+    execOptions.env = {
+      ...(execOptions.env ?? process.env),
+      AGENTROUTER_AGENT_DATA_DIR: dataDir,
+    };
+
     const proc = adapter.spawnExec(command, execOptions);
 
     // Phase 5: 追踪 PM 进程（用于 suggestion 路由）
@@ -194,6 +219,22 @@ export class AgentManager {
 
           // 写入 .jsonl（带 _sender）
           logStream.write(JSON.stringify(enriched) + '\n');
+
+          // M4 #8: 从 completion 事件提取 token 用量并记录
+          if (event.event === 'completion') {
+            const usage = event.data?.usage as Record<string, unknown> | undefined;
+            if (usage && typeof usage === 'object') {
+              const promptTokens = typeof usage.promptTokens === 'number' ? usage.promptTokens
+                : typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0;
+              const completionTokens = typeof usage.completionTokens === 'number' ? usage.completionTokens
+                : typeof usage.completion_tokens === 'number' ? usage.completion_tokens : 0;
+              const model = String(event.data?.model || usage.model || '');
+              if (promptTokens > 0 || completionTokens > 0) {
+                this.recordTokenUsage(sessionId, agentName, promptTokens, completionTokens, model);
+              }
+            }
+          }
+
           // 转发给回调或直接发送到渲染进程
           if (this.onEventCallback) {
             this.onEventCallback(agentName, enriched);
@@ -338,5 +379,16 @@ export class AgentManager {
         // process may already be dead
       }
     }
+  }
+
+  /** M4 #8: 异步记录 Token 用量 */
+  private recordTokenUsage(sessionId: string, agentType: string, promptTokens: number, completionTokens: number, model: string): void {
+    import('../database/repository').then(({ recordTokenUsage }) => {
+      recordTokenUsage(sessionId, agentType, promptTokens, completionTokens, model).catch(err => {
+        console.error(`[Token] Failed to record token usage:`, err);
+      });
+    }).catch(err => {
+      console.error(`[Token] Failed to import repository:`, err);
+    });
   }
 }

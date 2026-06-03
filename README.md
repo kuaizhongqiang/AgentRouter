@@ -11,23 +11,23 @@
 ```
 AgentRouter/
 ├── electron/                  Electron 主进程 + TypeScript
-│   ├── main.ts                窗口管理 + IPC 注册
+│   ├── main.ts                窗口管理 + IPC 注册 + Tray/通知/快捷键/菜单
 │   ├── preload.ts             contextBridge API (多 Agent)
 │   ├── ipc/                   IPC 处理器（按领域拆分）
-│   │   ├── projects.ts        项目 CRUD
+│   │   ├── projects.ts        项目 CRUD + 源文件扫描 + 项目配置
 │   │   ├── sessions.ts        对话 CRUD
 │   │   ├── messages.ts        消息 CRUD
 │   │   ├── tasks.ts           任务 CRUD + 记忆 + 动态调整
-│   │   ├── agents.ts          Agent 执行 IPC + suggestion 路由
+│   │   ├── agents.ts          Agent 执行 IPC + suggestion 路由 + token 计费
 │   │   └── credentials.ts     统一凭证 IPC（API Key / Base URL / 模型名）
 │   ├── credentials.ts          统一凭证管理（读写 ~/.agentrouter/credentials.json）
 │   ├── database/              数据层
 │   │   ├── index.ts            SQLite 初始化 (sql.js)
-│   │   ├── migrations.ts       Schema 迁移 (v1-v4)
+│   │   ├── migrations.ts       Schema 迁移 (v1-v6: 含任务模板/token计费)
 │   │   └── repository.ts       CRUD 操作 + 记忆系统
 │   ├── agents/                Agent 管理层
 │   │   ├── adapter.ts          AgentAdapter 接口 (+ SenderMetadata/AgentManifest)
-│   │   ├── manager.ts          AgentManager (+ _sender 注入 + PM 生命周期)
+│   │   ├── manager.ts          AgentManager (+ _sender 注入 + PM 生命周期 + token记录)
 │   │   ├── task-parser.ts      任务块解析器（PM 拆解 + context）
 │   │   ├── codewhale.ts        CodeWhale 适配器 (+ manifest)
 │   │   ├── reasonix.ts         Reasonix 适配器 (+ manifest)
@@ -39,9 +39,18 @@ AgentRouter/
 │   │   ├── executor.ts         并行执行 + 冲突检测 + 信号量
 │   │   └── pm-lifecycle.ts     PM 生命周期 + suggestion 路由
 │   └── mcp/                    MCP 服务器 (Phase 6)
-│       └── server.ts           文件工具 (read/write/search)
+│       └── server.ts           文件工具 + git (status/log) + web.fetch
 ├── src/                       Vue 3 前端
-│   └── App.vue                三栏 UI + Agent 标签 + mode 选择 + 推理气泡
+│   ├── App.vue                三栏 UI (Splitpanes) + 模式选择 + 推理气泡
+│   ├── main.js                Vue 入口 + i18n 初始化
+│   ├── Settings.vue           全局设置页面
+│   ├── Onboarding.vue         首次引导向导
+│   ├── DiffPanel.vue          Diff 审查面板
+│   └── locales/               国际化语言包
+│       ├── zh-CN.ts            简体中文 (~120 键)
+│       └── en-US.ts            英文
+├── resources/                  资源文件
+│   └── tray-icon.png           托盘图标
 ├── ProjectVision/              愿景文档体系（参阅基准）
 ├── docs/                      设计文档 & 报告
 │   ├── GOALS.md                核心目标
@@ -52,7 +61,8 @@ AgentRouter/
 │   ├── PHASE3.md               第三期及后续规划（基于 ProjectVision）
 │   ├── SCENARIO.md             全流程场景推演
 │   ├── AUDIT_REPORT.md         审计报告（96% 对齐）
-│   └── TEST_REPORT.md          测试报告（100/100 PASS）
+│   ├── TEST_REPORT.md          测试报告（100/100 PASS）
+│   └── plugin-system.md        插件系统设计文档
 ├── test/                       运行时测试
 │   ├── smoke-test.mjs          端到端冒烟测试
 │   └── runtime-test-2.mjs      Phase 3-6 运行时集成测试（100 项）
@@ -85,9 +95,27 @@ AgentRouter/
 | **PM 生命周期** | ✅ Phase 5 | PM 进程追踪 + stdin suggestion 转发 |
 | **推理气泡** | ✅ Phase 6 | Reasonix reasoningDelta → 前端紫色气泡实时显示 |
 | **长期记忆系统** | ✅ Phase 6 | memories 表 + CRUD IPC + preload 全链路 |
-| **Session 回放** | ✅ Phase 6 | 读取 .jsonl 事件文件按时间戳回放 |
-| **MCP 工具注入** | ✅ Phase 6 | 自动启动 MCP Server（file.read/write/search）|
+| **MCP 工具注入** | ✅ Phase 6 | 自动启动 MCP Server（file/git/web）|
 | **统一凭证管理** | ✅ | 一次配置 API Key/Base URL/模型，所有 Agent 共享 |
+| **系统托盘 Tray** | ✅ v1.0 | 最小化到托盘，右键菜单唤出/退出 |
+| **原生通知** | ✅ v1.0 | Agent 完成/出错时系统通知，点击唤出窗口 |
+| **全局快捷键** | ✅ v1.0 | Ctrl+Shift+A 唤出 / Ctrl+Shift+H 隐藏 |
+| **三栏拖拽布局** | ✅ v1.0 | Splitpanes 可拖拽拉伸，最小宽度约束 |
+| **浅色/深色主题** | ✅ v1.0 | 一键切换，localStorage 持久化 |
+| **全局设置页面** | ✅ v1.0 | 默认 Agent/模式/语言/主题 配置 |
+| **首次引导向导** | ✅ v1.0 | 4 步引导：欢迎→创建项目→选 Agent→首次对话 |
+| **斜杠命令系统** | ✅ v1.0 | `/fix` `/feat` `/review` `/refactor` `/test` `/doc`，模糊搜索 |
+| **任务模板** | ✅ v1.0 | 预置"修复 Bug / 添加功能 / 代码审查"模板，支持自定义 |
+| **Session 回放** | ✅ v1.0 | 按 sessionId 读取历史消息回放 |
+| **Diff 审查面板** | ✅ v1.0 | Unicode diff 渲染，文件列表切换，added/removed 着色 |
+| **代码审查模式** | ✅ v1.0 | 文件选择器 + Agent 自动审查 + 接受/拒绝按钮 |
+| **顶部菜单栏** | ✅ v1.0 | File / Edit / View / Help 标准菜单 |
+| **国际化 i18n** | ✅ v1.0 | 中文/英文完整覆盖，设置页一键切换 |
+| **项目级配置文件** | ✅ v1.0 | 项目根目录 agentrouter.json 覆盖全局设置 |
+| **Token 计费统计** | ✅ v1.0 | 每 Session Token 用量记录 + 消息气泡内联显示 |
+| **Agent 数据路径统一** | ✅ v1.0 | 所有 Agent 数据统一到 ~/.agentrouter/agents/ |
+| **MCP 扩展** | ✅ v1.0 | git.status / git.log / web.fetch 工具 |
+| **插件系统设计** | ✅ v1.0 | 文档设计方案，支持生命周期钩子和安全沙箱 |
 | **Deep Code 集成** | ✅ | `platform exec` 子命令 + NDJSON 事件流 |
 | **OpenCode 集成** | ✅ | `platform exec` 子命令 + reasoning 气泡支持 |
 | **CodeWhale 集成** | ✅ | `--platform-mode` 参数 + `--role pm` |
@@ -211,13 +239,17 @@ build.bat
 
 ## 数据存储
 
-`~/.agentrouter/agentrouter.db` — SQLite 数据库 (sql.js WASM 引擎)，包含 `projects`、`sessions`、`messages`、`tasks`、`agent_logs`、`memories` 表。
+`~/.agentrouter/agentrouter.db` — SQLite 数据库 (sql.js WASM 引擎)，包含 `projects`、`sessions`、`messages`、`tasks`、`agent_logs`、`memories`、`task_templates`、`token_usage` 表。
 
 `~/.agentrouter/credentials.json` — 统一凭证文件（API Key / Base URL），所有 Agent 共享。
 
 Agent 执行日志输出到 `~/.agentrouter/projects/<id>/sessions/<id>/events/`（JSON Lines 格式）
 
+Agent 数据目录统一为 `~/.agentrouter/agents/{name}/`，所有适配器共享同一根路径。
+
 Agent 记忆存储在同目录的 `memories` 表中，按项目+Agent 名索引。
+
+项目根目录的 `agentrouter.json` 可覆盖全局设置（默认 Agent/模式/主题等）。
 
 ---
 

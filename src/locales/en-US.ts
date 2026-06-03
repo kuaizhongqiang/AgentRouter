@@ -1,0 +1,198 @@
+export default {
+  app: {
+    title: 'AgentRouter',
+  },
+
+  toolbar: {
+    settings: 'Settings',
+    switchLight: 'Switch to light mode',
+    switchDark: 'Switch to dark mode',
+    review: 'Code Review',
+    modes: {
+      dialog: 'Dialog',
+      pm: 'PM Decompose',
+      yolo: 'YOLO',
+      approval: 'Approval',
+      stepwise: 'Step-by-Step',
+      preview: 'Preview',
+      codeReview: 'Code Review',
+    },
+    agent: {
+      online: 'Ready',
+      offline: 'Offline',
+      starting: 'Starting',
+      doctor: 'Diagnose',
+    },
+  },
+
+  sidebar: {
+    projects: 'Projects',
+    newProject: 'New Project',
+    remove: 'Remove',
+    credentials: 'Credentials',
+    save: 'Save',
+    saved: 'Saved',
+    apiKeyPlaceholder: 'API Key (sk-...)',
+    baseUrlPlaceholder: 'Base URL (https://...)',
+    dialog: {
+      title: 'New Project',
+      name: 'Project Name',
+      path: 'Folder Path',
+      cancel: 'Cancel',
+      create: 'Create',
+    },
+  },
+
+  chat: {
+    placeholder: {
+      default: 'Send command to {agent}...',
+      pm: 'Describe requirements, Reasonix (PM) will decompose into tasks...',
+      codeReview: 'Enter file paths to review (comma separated) or review focus...',
+    },
+    noSession: 'Select or create a session',
+    noProject: 'Please select a project first',
+    user: 'You',
+    system: 'System',
+    send: 'Send',
+    doctor: 'Diagnose',
+  },
+
+  messages: {
+    reasoningLabel: 'Reasoning',
+    agentLabel: 'Agent',
+    tokenInfo: 'Total {count} tokens',
+  },
+
+  tasks: {
+    title: 'Tasks',
+    empty: 'No tasks',
+    pending: 'Pending',
+    running: 'Running',
+    completed: 'Done',
+    archived: 'Archived',
+    approvePlan: 'Approve Plan',
+    summarize: 'Summarize Mission',
+    suggestion: 'Agent is suggesting...',
+    approve: 'Accept',
+    reject: 'Reject',
+  },
+
+  review: {
+    accept: 'Accept',
+    reject: 'Reject',
+    accepted: '✓ Review accepted',
+    rejected: '✕ Review rejected',
+    fileSelector: {
+      title: 'Select Files for Review',
+      hint: 'Check files to review, then confirm to auto-construct the prompt',
+      search: 'Search files...',
+      noMatch: 'No matching files',
+      focus: 'Review Focus',
+      focusPlaceholder: 'Code quality, performance, security, maintainability',
+      cancel: 'Cancel',
+      start: 'Start Review',
+      selected: '{count} file(s) selected',
+    },
+  },
+
+  diff: {
+    title: 'File Changes',
+    empty: 'No file changes',
+    noContent: 'No diff content',
+    fileAdded: 'Added',
+    fileModified: 'Modified',
+    fileDeleted: 'Deleted',
+    fileRenamed: 'Renamed',
+    added: 'A',
+    modified: 'M',
+    deleted: 'D',
+    renamed: 'R',
+  },
+
+  token: {
+    title: 'Token Usage',
+    empty: 'No token data',
+    prompt: 'Input (Prompt)',
+    completion: 'Output (Completion)',
+    total: 'Total',
+    model: 'Model',
+  },
+
+  settings: {
+    title: 'Settings',
+    close: 'Close',
+    defaultAgent: 'Default Agent',
+    defaultMode: 'Default Mode',
+    language: 'Language',
+    theme: 'Theme',
+    themeDark: 'Dark',
+    themeLight: 'Light',
+    langZh: '简体中文',
+    langEn: 'English',
+  },
+
+  onboarding: {
+    welcome: {
+      title: 'Welcome to AgentRouter',
+      desc: 'AgentRouter is an AI-driven multi-agent collaboration platform. Through intelligent task scheduling and team collaboration, it lets you focus on high-value creative work.',
+      multiAgent: 'Multi-Agent Collaboration',
+      taskSplitting: 'Smart Task Decomposition',
+      flexibleModes: 'Flexible Mode Switching',
+    },
+    createProject: {
+      title: 'Create Your First Project',
+      desc: 'A project is the working unit in AgentRouter, containing conversations, task lists, and generated files.',
+      name: 'Project Name',
+      path: 'Folder Path',
+    },
+    selectAgent: {
+      title: 'Choose Default Coding Assistant',
+      desc: 'Select an Agent as your primary coding assistant. You can switch anytime from the toolbar.',
+    },
+    ready: {
+      title: 'All Set',
+      desc: 'Project {project} created, default assistant is {agent}.',
+      tip: 'Type a command in the input box to start a conversation, or use {code} to see available slash commands.',
+    },
+    skip: 'Skip Tour',
+    prev: 'Back',
+    next: 'Next',
+    start: 'Get Started',
+  },
+
+  commands: {
+    title: 'Slash Commands',
+    noMatch: 'No matching commands',
+    fix: 'Fix Bug',
+    fixDetail: 'Analyze code and auto-fix defects',
+    feat: 'Add Feature',
+    featDetail: 'Implement new feature from requirements',
+    review: 'Code Review',
+    reviewDetail: 'Review code quality of current project',
+    refactor: 'Refactor',
+    refactorDetail: 'Optimize code structure and maintainability',
+    test: 'Add Tests',
+    testDetail: 'Generate unit tests for code',
+    doc: 'Update Docs',
+    docDetail: 'Generate or update project documentation',
+  },
+
+  notification: {
+    completed: '{agent} task completed',
+    error: '{agent} execution error: {error}',
+  },
+
+  common: {
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    close: 'Close',
+    save: 'Save',
+    create: 'Create',
+    skip: 'Skip',
+    prev: 'Previous',
+    next: 'Next',
+    start: 'Get Started',
+    search: 'Search',
+    noData: 'No data',
+  },
+}

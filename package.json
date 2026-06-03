@@ -23,6 +23,7 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "resources/**/*",
       "package.json"
     ],
     "win": {
@@ -33,21 +34,22 @@
     "portable": {
       "artifactName": "AgentRouter-${version}.exe"
     },
-    "portable": {
-      "artifactName": "AgentRouter-${version}.exe"
-    },
     "extraMetadata": {
       "main": "dist-electron/main.js"
     },
     "electronDist": "node_modules/electron/dist"
   },
   "dependencies": {
+    "diff": "^9.0.0",
     "pinia": "^3.0.4",
+    "splitpanes": "^4.1.2",
     "sql.js": "^1.14.1",
-    "vue": "^3.5.32"
+    "vue": "^3.5.32",
+    "vue-i18n": "^11.1.10"
   },
   "devDependencies": {
     "@electron/asar": "^4.2.0",
+    "@types/diff": "^7.0.2",
     "@types/node": "^25.9.1",
     "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-vue": "^6.0.6",

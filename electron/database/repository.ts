@@ -384,3 +384,120 @@ export async function deleteMemory(id: string): Promise<void> {
   d.run('DELETE FROM memories WHERE id = ?', [id]);
   saveDatabase();
 }
+
+// ── 任务模板 CRUD (M2) ──
+
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  description: string;
+  tasks: string; // JSON 字符串
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function createTaskTemplate(name: string, description: string, tasks: string): Promise<TaskTemplate> {
+  const d = await db();
+  const t: TaskTemplate = { id: idgen(), name, description, tasks, createdAt: now(), updatedAt: now() };
+  d.run(
+    'INSERT INTO task_templates (id, name, description, tasks, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+    [t.id, t.name, t.description, t.tasks, t.createdAt, t.updatedAt]
+  );
+  saveDatabase();
+  return t;
+}
+
+export async function getTaskTemplates(): Promise<TaskTemplate[]> {
+  const d = await db();
+  const stmt = d.prepare('SELECT * FROM task_templates ORDER BY createdAt DESC');
+  const results: TaskTemplate[] = [];
+  while (stmt.step()) results.push(stmt.getAsObject() as unknown as TaskTemplate);
+  stmt.free();
+  return results;
+}
+
+export async function deleteTaskTemplate(id: string): Promise<void> {
+  const d = await db();
+  d.run('DELETE FROM task_templates WHERE id = ?', [id]);
+  saveDatabase();
+}
+
+// ── 消息查询 (M2: Issue #20) ──
+
+export interface ReplayMessage {
+  role: string;
+  content: string;
+  createdAt: string;
+  event?: string;
+}
+
+export async function getMessagesBySession(sessionId: string): Promise<ReplayMessage[]> {
+  const d = await db();
+  const stmt = d.prepare('SELECT role, content, timestamp AS createdAt FROM messages WHERE sessionId = ? ORDER BY timestamp ASC');
+  stmt.bind([sessionId]);
+  const results: ReplayMessage[] = [];
+  while (stmt.step()) results.push(stmt.getAsObject() as unknown as ReplayMessage);
+  stmt.free();
+  return results;
+}
+
+// ── Token 用量 CRUD (M4 #8) ──
+
+export interface TokenUsage {
+  id: string;
+  sessionId: string;
+  agentType: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  model: string;
+  createdAt: string;
+}
+
+export interface TokenUsageStats {
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalTokens: number;
+}
+
+export async function recordTokenUsage(
+  sessionId: string,
+  agentType: string,
+  promptTokens: number,
+  completionTokens: number,
+  model: string
+): Promise<TokenUsage> {
+  const d = await db();
+  const totalTokens = promptTokens + completionTokens;
+  const t: TokenUsage = {
+    id: idgen(),
+    sessionId,
+    agentType,
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    model,
+    createdAt: now(),
+  };
+  d.run(
+    'INSERT INTO token_usage (id, sessionId, agentType, promptTokens, completionTokens, totalTokens, model, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [t.id, t.sessionId, t.agentType, t.promptTokens, t.completionTokens, t.totalTokens, t.model, t.createdAt]
+  );
+  saveDatabase();
+  return t;
+}
+
+export async function getSessionTokenUsage(sessionId: string): Promise<TokenUsageStats> {
+  const d = await db();
+  const stmt = d.prepare(
+    'SELECT COALESCE(SUM(promptTokens), 0) AS totalPromptTokens, COALESCE(SUM(completionTokens), 0) AS totalCompletionTokens, COALESCE(SUM(totalTokens), 0) AS totalTokens FROM token_usage WHERE sessionId = ?'
+  );
+  stmt.bind([sessionId]);
+  if (stmt.step()) {
+    const result = stmt.getAsObject() as unknown as TokenUsageStats;
+    stmt.free();
+    return result;
+  }
+  stmt.free();
+  return { totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0 };
+}
