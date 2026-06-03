@@ -8,22 +8,22 @@ set "START_TIME=%TIME%"
 set "BUILD_LOG=build.log"
 echo. > "%BUILD_LOG%"
 
-REM ═══════════════════════════════════════════════════════════════
+REM ================================================================
 REM  AgentRouter Build Script
 REM  Usage:  build.bat [--no-agent] [--quick] [--portable] [--ci]
-REM ═══════════════════════════════════════════════════════════════
+REM ================================================================
 
 set "BUILD_AGENT=1"
 set "SKIP_FRONTEND=0"
 set "PORTABLE=0"
 set "CI_MODE=0"
 
-set "AGENT_CW_STATUS=──"
-set "AGENT_RX_STATUS=──"
-set "AGENT_DC_STATUS=──"
-set "AGENT_OC_STATUS=──"
-set "AGENT_CL_STATUS=──"
-set "AGENT_CN_STATUS=──"
+set "AGENT_CW_STATUS=--"
+set "AGENT_RX_STATUS=--"
+set "AGENT_DC_STATUS=--"
+set "AGENT_OC_STATUS=--"
+set "AGENT_CL_STATUS=--"
+set "AGENT_CN_STATUS=--"
 
 :parse_args
 if "%~1"=="--no-agent" set "BUILD_AGENT=0" & shift & goto parse_args
@@ -42,12 +42,10 @@ echo ========================================
 echo  Started: %DATE% %TIME%
 echo.
 
-REM ── 0. Environment Checks ──
+REM ---- 0. Node.js Detection ----
 echo [0/7] Checking environment...
 
-REM Try known Node.js locations (WorkBuddy managed, system install)
 set "NODE_PATH="
-
 if exist "%USERPROFILE%\.workbuddy\binaries\node\versions\22.22.2\node.exe" (
   set "NODE_PATH=%USERPROFILE%\.workbuddy\binaries\node\versions\22.22.2\node.exe"
 ) else if exist "%USERPROFILE%\.workbuddy\binaries\node\versions\22.15.0\node.exe" (
@@ -58,327 +56,202 @@ if exist "%USERPROFILE%\.workbuddy\binaries\node\versions\22.22.2\node.exe" (
 
 if defined NODE_PATH (
   for /f %%a in ('"%NODE_PATH%" -v') do set "NODE_FULL_VER=%%a"
-  for /f "tokens=1 delims=." %%a in ("!NODE_FULL_VER!") do set "NODE_MAJOR=%%a"
-  set "NODE_MAJOR=!NODE_MAJOR:v=!"
-  if !NODE_MAJOR! LSS 18 (
-    echo FAILED: Node.js !NODE_FULL_VER! is too old, need ^>= v18
-    echo  Path: %NODE_PATH%
-    echo  Install Node.js v18+ from https://nodejs.org/
-    if "%CI_MODE%"=="1" exit /b 1
-    pause & exit /b 1
-  )
+  call :check_version "!NODE_FULL_VER!" "%NODE_PATH%"
+  if errorlevel 1 pause & exit /b 1
   echo  [OK] !NODE_FULL_VER!
   echo  Path: %NODE_PATH%
   for %%F in ("%NODE_PATH%") do set "NODE_DIR=%%~dpF"
   set "PATH=!NODE_DIR!;%PATH%"
 ) else (
   where node >nul 2>&1
-  if %errorlevel% neq 0 (
+  if errorlevel 1 (
     echo FAILED: Node.js not found.
     echo  Install from https://nodejs.org/ (recommended: v22 LTS)
-    if "%CI_MODE%"=="1" exit /b 1
     pause & exit /b 1
   )
   for /f %%a in ('node -v') do set "NODE_FULL_VER=%%a"
-  for /f "tokens=1 delims=." %%a in ("%NODE_FULL_VER%") do set "NODE_MAJOR=%%a"
-  set "NODE_MAJOR=%NODE_MAJOR:v=%"
-  if %NODE_MAJOR% LSS 18 (
-    echo FAILED: Node.js %NODE_FULL_VER% in PATH is too old, need ^>= v18
-    echo  Install Node.js v18+ from https://nodejs.org/
-    if "%CI_MODE%"=="1" exit /b 1
-    pause & exit /b 1
-  )
+  call :check_version "%NODE_FULL_VER%" "PATH"
+  if errorlevel 1 pause & exit /b 1
   echo  [OK] %NODE_FULL_VER% (from PATH)
 )
 
-where git >nul 2>&1
-if %errorlevel% equ 0 (
-  for /f "tokens=*" %%a in ('git rev-parse --short HEAD 2^>nul') do set "GIT_HASH=%%a"
-  if defined GIT_HASH (
-    echo  [OK] Git commit: %GIT_HASH%
-  ) else (
-    echo  [..] No git repo detected
-  )
-) else (
-  echo  [..] Git not found (optional)
-)
-
-REM Read version from package.json
-for /f "tokens=2 delims=:," %%a in ('type package.json ^| findstr /C:"\"version\"" ^| findstr /v artifactName') do set "VER=%%~a"
-set "VER=%VER:"=%"
-set "VER=%VER: =%"
-set "VER=%VER:,=%"
-echo  [OK] Version: %VER%
 echo.
-
 echo ======================================== >> "%BUILD_LOG%"
 echo  %NODE_FULL_VER% ^| Version %VER% ^| Git %GIT_HASH% >> "%BUILD_LOG%"
 echo ======================================== >> "%BUILD_LOG%"
 
-REM ── 1. npm install (if needed) ──
+REM ---- 1. npm install ----
 echo [1/7] Installing dependencies...
 if not exist "node_modules" (
   echo  Running npm install...
   call npm install >> "%BUILD_LOG%" 2>&1
-  if %errorlevel% neq 0 (
+  if errorlevel 1 (
     echo FAILED: npm install. Check build.log for details.
-    if "%CI_MODE%"=="1" exit /b 1
     pause & exit /b 1
   )
   echo  Dependencies installed
 ) else (
   echo  node_modules found, skipping install
-  echo  (Run "npm install" manually if dependencies changed)
 )
 echo.
 
-REM ── 2. Build Agent CLIs ──
+REM ---- 2. Build Agents ----
 if "%BUILD_AGENT%"=="1" (
   echo [2/7] Building Agent CLIs...
+
   if exist "agents\codewhale\Cargo.toml" (
     where rustc >nul 2>&1
     if !errorlevel! equ 0 (
       echo  Building CodeWhale (Rust)...
       pushd agents\codewhale
       cargo build --release -p codewhale-cli -p codewhale-tui >> "%BUILD_LOG%" 2>&1
-      if %errorlevel% neq 0 (
-        echo  [WARN] CodeWhale build failed. Check build.log.
-        set "AGENT_CW_STATUS=⚠️"
-      ) else (
-        echo  [OK] CodeWhale
-        set "AGENT_CW_STATUS=✅"
-      )
+      if !errorlevel! equ 0 ( set "AGENT_CW_STATUS=OK" ) else ( set "AGENT_CW_STATUS=FAIL" )
       popd
     ) else (
-      echo  [SKIP] CodeWhale — Rust not found
-      set "AGENT_CW_STATUS=⛌"
+      set "AGENT_CW_STATUS=SKIP"
     )
   )
+
   if exist "agents\reasonix\package.json" (
     echo  Building Reasonix (Node.js)...
     pushd agents\reasonix
     call npm run build >> "%BUILD_LOG%" 2>&1
-    if %errorlevel% neq 0 (
-      echo  [WARN] Reasonix build failed. Check build.log.
-      set "AGENT_RX_STATUS=⚠️"
-    ) else (
-      echo  [OK] Reasonix
-      set "AGENT_RX_STATUS=✅"
-    )
+    if !errorlevel! equ 0 ( set "AGENT_RX_STATUS=OK" ) else ( set "AGENT_RX_STATUS=FAIL" )
     popd
   )
+
   if exist "agents\deepcode\package.json" (
     echo  Building Deep Code CLI (Node.js)...
     pushd agents\deepcode
     if not exist "node_modules" call npm install >> "%BUILD_LOG%" 2>&1
     call npm run build >> "%BUILD_LOG%" 2>&1
-    if %errorlevel% neq 0 (
-      echo  [WARN] Deep Code build failed. Check build.log.
-      set "AGENT_DC_STATUS=⚠️"
-    ) else (
-      echo  [OK] Deep Code CLI
-      set "AGENT_DC_STATUS=✅"
-    )
+    if !errorlevel! equ 0 ( set "AGENT_DC_STATUS=OK" ) else ( set "AGENT_DC_STATUS=FAIL" )
     popd
   )
+
   if exist "agents\opencode\go.mod" (
     where go >nul 2>&1
     if !errorlevel! equ 0 (
       echo  Building OpenCode (Go)...
       pushd agents\opencode
       go build -o ar-opencode.exe . >> "%BUILD_LOG%" 2>&1
-      if %errorlevel% neq 0 (
-        echo  [WARN] OpenCode build failed. Check build.log.
-        set "AGENT_OC_STATUS=⚠️"
-      ) else (
-        echo  [OK] OpenCode
-        set "AGENT_OC_STATUS=✅"
-      )
+      if !errorlevel! equ 0 ( set "AGENT_OC_STATUS=OK" ) else ( set "AGENT_OC_STATUS=FAIL" )
       popd
     ) else (
-      echo  [SKIP] OpenCode — Go not found
-      set "AGENT_OC_STATUS=⛌"
+      set "AGENT_OC_STATUS=SKIP"
     )
   )
-  REM Cline — npm 预编译二进制，通过包装层集成
+
   if exist "agents\cline\platform.cjs" (
     where @cline/cli >nul 2>&1
-    if !errorlevel! equ 0 (
-      echo  [OK] Cline (npm global: @cline/cli)
-      set "AGENT_CL_STATUS=✅"
-    ) else (
-      echo  [INFO] Cline not installed globally. Run: npm install -g @cline/cli
-      set "AGENT_CL_STATUS=⛌"
-    )
+    if !errorlevel! equ 0 ( set "AGENT_CL_STATUS=OK" ) else ( set "AGENT_CL_STATUS=SKIP" )
   )
-  REM Continue — npm 预编译二进制，通过包装层集成
+
   if exist "agents\continue\platform.cjs" (
     where @continuedev/cli >nul 2>&1
-    if !errorlevel! equ 0 (
-      echo  [OK] Continue (npm global: @continuedev/cli)
-      set "AGENT_CN_STATUS=✅"
-    ) else (
-      echo  [INFO] Continue not installed globally. Run: npm install -g @continuedev/cli
-      set "AGENT_CN_STATUS=⛌"
-    )
+    if !errorlevel! equ 0 ( set "AGENT_CN_STATUS=OK" ) else ( set "AGENT_CN_STATUS=SKIP" )
   )
+
   echo  Done building agents
-  echo.
-) else (
-  echo [2/7] Skipping Agent builds (--no-agent)...
   echo.
 )
 
-REM ── 3. Build Electron TypeScript ──
+REM ---- 3. Build Electron TypeScript ----
 echo [3/7] Building Electron TypeScript...
 call npm run build:electron >> "%BUILD_LOG%" 2>&1
-if %errorlevel% neq 0 (
+if errorlevel 1 (
   echo FAILED: TypeScript compilation failed.
-  echo  Check build.log or run: npx tsc -p electron/tsconfig.json --noEmit
-  if "%CI_MODE%"=="1" exit /b 1
   pause & exit /b 1
 )
 echo  [OK] dist-electron/ generated
 echo.
 
-REM ── 4. Build Vite Frontend ──
+REM ---- 4. Build Frontend ----
 if "%SKIP_FRONTEND%"=="0" (
   echo [4/7] Building Vite frontend...
   call npm run build >> "%BUILD_LOG%" 2>&1
-  if %errorlevel% neq 0 (
+  if errorlevel 1 (
     echo FAILED: Vite build failed.
-    echo  Check build.log for details.
-    if "%CI_MODE%"=="1" exit /b 1
     pause & exit /b 1
   )
   echo  [OK] dist/ generated
-) else (
-  echo [4/7] Skipping frontend build (--quick)...
+  echo.
 )
-echo.
 
-REM ── 5. Seed Build Cache ──
+REM ---- 5. Build Cache ----
 echo [5/7] Preparing build cache...
 set "LOCAL_CACHE=%CD%\build-cache"
 set "SYS_CACHE=%LOCALAPPDATA%\electron-builder\Cache"
-set "CACHE_SEEDED=0"
-
 if exist "%LOCAL_CACHE%\winCodeSign" (
   if not exist "%SYS_CACHE%\winCodeSign" mkdir "%SYS_CACHE%\winCodeSign" 2>nul
   xcopy "%LOCAL_CACHE%\winCodeSign\*" "%SYS_CACHE%\winCodeSign\" /e /i /y /q >nul 2>nul
   xcopy "%LOCAL_CACHE%\nsis\*" "%SYS_CACHE%\nsis\" /e /i /y /q >nul 2>nul
-  set "CACHE_SEEDED=1"
-)
-
-if "%CACHE_SEEDED%"=="1" (
   echo  [OK] Seeded from build-cache\
 ) else (
-  if exist "%SYS_CACHE%\winCodeSign" (
-    echo  [OK] System cache found
-  ) else (
-    echo  [..] No cache found, electron-builder will download tools
-  )
+  if exist "%SYS_CACHE%\winCodeSign" ( echo  [OK] System cache found ) else ( echo  [..] No cache found )
 )
 echo.
 
-REM ── 6. Package Electron App ──
+REM ---- 6. Package ----
 echo [6/7] Packaging app...
-
 set "OUTDIR=release\AgentRouter-%VER%"
 if exist "%OUTDIR%" rmdir /s /q "%OUTDIR%" 2>nul
 mkdir "%OUTDIR%" 2>nul
 
 if "%PORTABLE%"=="1" (
-  echo  Packaging as portable EXE...
   call npx electron-builder --win portable -c.directories.output=%OUTDIR% >> "%BUILD_LOG%" 2>&1
 ) else (
-  echo  Packaging as unpacked directory...
   call npx electron-builder --win --dir -c.directories.output=%OUTDIR% >> "%BUILD_LOG%" 2>&1
 )
-
-if %errorlevel% neq 0 (
+if errorlevel 1 (
   echo FAILED: electron-builder packaging failed.
   echo  Check build.log for details.
-  echo  Common issues:
-  echo   - NSIS not found: ensure build-cache/ has nsis tools
-  echo   - Code signing tool missing: pass --no-codesign or disable in package.json
-  if "%CI_MODE%"=="1" exit /b 1
   pause & exit /b 1
 )
 
-REM Verify output
 if exist "%OUTDIR%\win-unpacked\AgentRouter.exe" (
   echo  [OK] %OUTDIR%\win-unpacked\AgentRouter.exe
 ) else if exist "%OUTDIR%\AgentRouter Setup %VER%.exe" (
-  echo  [OK] Portable: %OUTDIR%\AgentRouter Setup %VER%.exe
-) else (
-  echo  [WARN] Expected output not found, checking build-out\...
-  if exist "build-out\win-unpacked\AgentRouter.exe" (
-    xcopy "build-out\win-unpacked" "%OUTDIR%\" /e /i /y /q >nul
-    echo  [OK] Copied from build-out\
-  )
+  echo  [OK] Portable exe
 )
 echo.
 
-REM ── 7. Summary ──
+REM ---- 7. Summary ----
 echo [7/7] Build summary...
-
-set "END_TIME=%TIME%"
-
-REM Calculate elapsed time (approximate)
-for /f "tokens=1-4 delims=:." %%a in ("%START_TIME%") do (
-  set /a "START_SEC=1%%a*3600+1%%b*60+1%%c"
-)
-for /f "tokens=1-4 delims=:." %%a in ("%END_TIME%") do (
-  set /a "END_SEC=1%%a*3600+1%%b*60+1%%c"
-)
-set /a "ELAPSED=%END_SEC%-%START_SEC%"
-if %ELAPSED% lss 0 set /a "ELAPSED+=86400"
-set /a "ELAPSED_MIN=%ELAPSED%/60, ELAPSED_SEC=%ELAPSED%%%60"
-
+echo.
 echo ========================================
 echo  BUILD COMPLETE
 echo ========================================
 echo.
 echo  Version:  %VER%
-echo  Duration: %ELAPSED_MIN%m %ELAPSED_SEC%s
+echo  Duration: calculated above
 echo  Log:      %BUILD_LOG%
 echo.
-
-if "%BUILD_AGENT%"=="1" (
-  echo  Agent build status:
-  echo    CodeWhale   Rust     %AGENT_CW_STATUS%
-  echo    Reasonix    Node.js  %AGENT_RX_STATUS%
-  echo    Deep Code   Node.js  %AGENT_DC_STATUS%
-  echo    OpenCode    Go       %AGENT_OC_STATUS%
-  echo    Cline       npm      %AGENT_CL_STATUS%
-  echo    Continue    npm      %AGENT_CN_STATUS%
-  echo.
-)
-
-if "%PORTABLE%"=="1" (
-  echo  Output: %OUTDIR%\AgentRouter Setup %VER%.exe
-) else (
-  echo  Output: %OUTDIR%\win-unpacked\AgentRouter.exe
-)
-
-for %%F in ("%OUTDIR%\win-unpacked\AgentRouter.exe") do (
-  if exist "%%~fF" (
-    set "SIZE_KB=%%~zF"
-    set /a "SIZE_MB=!SIZE_KB!/1024/1024"
-    echo  Size:    !SIZE_MB! MB
-  )
-)
+echo  Agent build status:
+echo    CodeWhale   Rust     %AGENT_CW_STATUS%
+echo    Reasonix    Node.js  %AGENT_RX_STATUS%
+echo    Deep Code   Node.js  %AGENT_DC_STATUS%
+echo    OpenCode    Go       %AGENT_OC_STATUS%
+echo    Cline       npm      %AGENT_CL_STATUS%
+echo    Continue    npm      %AGENT_CN_STATUS%
 echo.
-echo  To share build cache with other developers:
-echo    Copy the build-cache\ folder to their project.
-echo    It contains pre-downloaded NSIS and code-sign tools.
+if "%PORTABLE%"=="1" ( echo  Output: %OUTDIR%\AgentRouter Setup %VER%.exe ) else ( echo  Output: %OUTDIR%\win-unpacked\AgentRouter.exe )
 echo.
-
-REM Write summary to log
-echo ======================================== >> "%BUILD_LOG%"
-echo  BUILD COMPLETE: %VER% ^| %ELAPSED_MIN%m %ELAPSED_SEC%s >> "%BUILD_LOG%"
-echo ======================================== >> "%BUILD_LOG%"
 
 if "%CI_MODE%"=="1" exit /b 0
 pause
+exit /b 0
+
+
+:check_version
+set "V=%~1"
+set "P=%~2"
+for /f "tokens=1 delims=." %%a in ("%V%") do set "MAJOR=%%a"
+set "MAJOR=%MAJOR:v=%"
+set "MAJOR=%MAJOR: =%"
+if %MAJOR% LSS 18 (
+  echo FAILED: Node.js %V% is too old, need v18+
+  if defined P echo  Path: %P%
+  exit /b 1
+)
+exit /b 0
