@@ -45,22 +45,48 @@ echo.
 REM ── 0. Environment Checks ──
 echo [0/7] Checking environment...
 
-where node >nul 2>&1
-if %errorlevel% neq 0 (
-  echo FAILED: Node.js not found. Install from https://nodejs.org/
+REM Try known Node.js locations first (managed/WorkBuddy, nvm, etc.)
+set "NODE_PATH="
+set "NODE_MAJOR=0"
+
+if exist "%USERPROFILE%\.workbuddy\binaries\node\versions\22.22.2\node.exe" (
+  set "NODE_PATH=%USERPROFILE%\.workbuddy\binaries\node\versions\22.22.2\node.exe"
+) else if exist "%USERPROFILE%\.workbuddy\binaries\node\versions\22.15.0\node.exe" (
+  set "NODE_PATH=%USERPROFILE%\.workbuddy\binaries\node\versions\22.15.0\node.exe"
+) else if exist "C:\Program Files\nodejs\node.exe" (
+  set "NODE_PATH=C:\Program Files\nodejs\node.exe"
+)
+
+if defined NODE_PATH (
+  for /f "tokens=1,2 delims=v." %%a in ('"%NODE_PATH%" -v') do set "NODE_MAJOR=%%~b"
+) else (
+  where node >nul 2>&1
+  if %errorlevel% neq 0 (
+    echo FAILED: Node.js not found.
+    echo  Install from https://nodejs.org/ (recommended: v22 LTS)
+    echo  Or use nvm: https://github.com/coreybutler/nvm-windows
+    if "%CI_MODE%"=="1" exit /b 1
+    pause & exit /b 1
+  )
+  for /f "tokens=1,2 delims=v." %%a in ('node -v') do set "NODE_MAJOR=%%~b"
+)
+
+if %NODE_MAJOR% LSS 18 (
+  echo FAILED: Node.js v%NODE_MAJOR% is too old, need ^>= 18
+  if defined NODE_PATH echo  Found at: %NODE_PATH%
+  echo  Install Node.js v18+ from https://nodejs.org/ or use nvm
   if "%CI_MODE%"=="1" exit /b 1
   pause & exit /b 1
 )
 
-for /f "tokens=1,2 delims=v." %%a in ('node -v') do (
-  set "NODE_MAJOR=%%~b"
-)
-if %NODE_MAJOR% LSS 18 (
-  echo FAILED: Node.js version %NODE_MAJOR% detected, need ^>= 18
-  if "%CI_MODE%"=="1" exit /b 1
-  pause & exit /b 1
-)
 echo  [OK] Node.js v%NODE_MAJOR%.x
+if defined NODE_PATH echo  Path: %NODE_PATH%
+
+REM If we found a managed Node.js, prefix PATH with it so all npm/packages use it
+if defined NODE_PATH (
+  for %%F in ("%NODE_PATH%") do set "NODE_DIR=%%~dpF"
+  set "PATH=!NODE_DIR!;%PATH%"
+)
 
 where git >nul 2>&1
 if %errorlevel% equ 0 (
