@@ -1223,6 +1223,18 @@ body {
 }
 .layout { height: 100vh; }
 
+/* ═══ Pane 高度约束 — 防止 flex 溢出推走输入框 ═══ */
+.main-pane, .sidebar-pane {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.main-pane > .main {
+  flex: 1;
+  min-height: 0;
+}
+
 /* ═══ Splitpanes 自定义样式 ═══ */
 .splitpanes__splitter {
   background: var(--color-border);
@@ -1370,7 +1382,7 @@ body {
 .project-item:hover .icon-btn.small { opacity: 0.6; }
 
 /* ═══ 主区域 ═══ */
-.main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-main); transition: background var(--transition); }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg-main); transition: background var(--transition); }
 
 /* ═══ Toolbar ═══ */
 .toolbar {
@@ -1422,7 +1434,7 @@ body {
 .tab:hover .tab-close { opacity: 0.6; }
 
 /* ═══ 消息区 ═══ */
-.messages { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.messages { flex: 1; overflow-y: auto; padding: 16px 20px; min-height: 0; }
 .messages::-webkit-scrollbar { width: 4px; }
 .messages::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 4px; }
 .msg { margin-bottom: 16px; max-width: 85%; transition: all var(--transition); }
