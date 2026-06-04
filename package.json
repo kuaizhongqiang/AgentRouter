@@ -10,7 +10,7 @@
     "build:electron": "tsc -p electron/tsconfig.json && node -e \"require('fs').writeFileSync('dist-electron/package.json', JSON.stringify({type:'commonjs'},null,2))\"",
     "postinstall": "node -e \"const f='agents/reasonix/dist/data/deepseek-tokenizer.json.gz',s='agents/reasonix/node_modules/reasonix/data/deepseek-tokenizer.json.gz';require('fs').existsSync(f)||(require('fs').cpSync(s,f),console.log('Copied tokenizer'))\"",
     "dev:electron": "npm run build:electron && node run-electron.cjs .",
-    "electron:dev": "npm run build:electron && concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env ELECTRON_RUN_AS_NODE=0 VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "electron:dev": "npm run build:electron && concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 node run-electron.cjs .\"",
     "electron:build": "npm run build:electron && vite build && electron-builder --win --dir",
     "preview": "vite preview"
   },
