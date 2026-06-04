@@ -2,6 +2,7 @@
  * AgentRouter — 项目 CRUD IPC 处理器
  */
 import type { IpcMain } from 'electron';
+import type { AgentManager } from '../agents/manager';
 import * as repo from '../database/repository';
 import fs from 'fs';
 import path from 'path';
@@ -45,13 +46,22 @@ function scanSourceFiles(dir: string, baseDir: string): Array<{ path: string; na
   return results;
 }
 
-export function registerProjectHandlers(ipcMain: IpcMain): void {
+export function registerProjectHandlers(ipcMain: IpcMain, manager?: AgentManager): void {
   ipcMain.handle('db:listProjects', async () => {
     return repo.listProjects();
   });
 
   ipcMain.handle('db:createProject', async (_e, name: string, projectPath: string) => {
-    return repo.createProject(name, projectPath);
+    const project = await repo.createProject(name, projectPath);
+    // Phase 7 #33: 创建项目时初始化 Agent 记忆目录
+    if (manager) {
+      try {
+        manager.ensureProjectAgentDataDirs(projectPath);
+      } catch (err) {
+        console.warn('[Project] Failed to init agent data dirs:', err);
+      }
+    }
+    return project;
   });
 
   ipcMain.handle('db:removeProject', async (_e, id: string) => {
@@ -60,6 +70,15 @@ export function registerProjectHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle('db:getProject', async (_e, id: string) => {
     return repo.getProject(id);
+  });
+
+  /** Phase 7 #33: 初始化项目级 Agent 记忆目录 */
+  ipcMain.handle('project:initAgentDirs', async (_e, projectPath: string) => {
+    if (manager) {
+      manager.ensureProjectAgentDataDirs(projectPath);
+      return { done: true };
+    }
+    return { done: false, error: 'Manager not ready' };
   });
 
   /** M3: 列出项目目录下的源文件树 */

@@ -131,6 +131,28 @@ export function registerAgentHandlers(
     return manager.getManifest(agentName);
   });
 
+  // Phase 7 #46: Agent 健康检查与禁用
+  ipcMain.handle('agent:health', async () => {
+    return manager.getAllAgentsHealth();
+  });
+
+  ipcMain.handle('agent:health:check', async () => {
+    return manager.checkAllAgentsHealth();
+  });
+
+  ipcMain.handle('agent:disable', async (_e, agentName: string) => {
+    manager.disableAgent(agentName);
+  });
+
+  ipcMain.handle('agent:enable', async (_e, agentName: string) => {
+    manager.enableAgent(agentName);
+  });
+
+  // Phase 7 #46: 含健康状态的 Agent 列表
+  ipcMain.handle('agent:listWithHealth', async () => {
+    return manager.listWithHealth();
+  });
+
   // Phase 6: Session 回放 — 读取 .jsonl 事件文件并逐行返回
   ipcMain.handle('agent:replay', async (_e, sessionId: string, projectId: string) => {
     const eventsDir = path.join(os.homedir(), '.agentrouter', 'projects', projectId, 'sessions', sessionId, 'events');

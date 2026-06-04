@@ -16,6 +16,14 @@ import type { AgentAdapter, AgentEvent, AgentExecOptions, SenderMetadata } from 
 import type { AgentLog } from '../types';
 import { getCredentialsEnv } from '../credentials';
 
+export interface AgentHealthStatus {
+  agentName: string;
+  healthy: boolean;
+  status: 'untested' | 'healthy' | 'unhealthy' | 'disabled';
+  error?: string;
+  checkedAt: string | null;
+}
+
 export class AgentManager {
   private adapters = new Map<string, AgentAdapter>();
   private runningProcesses = new Map<string, { proc: import('child_process').ChildProcess; logId: string }>();
@@ -28,11 +36,17 @@ export class AgentManager {
   /** Phase 5: 会话 → PM 进程映射（用于 suggestion 路由） */
   private pmProcesses = new Map<string, { agentName: string; proc: import('child_process').ChildProcess }>();
 
-  // ── M4 #16: Agent 数据目录 ──
+  /** Phase 7 #46: Agent 健康状态缓存 */
+  private agentHealth = new Map<string, AgentHealthStatus>();
 
-  /** 获取 Agent 统一数据目录 (~/.agentrouter/agents/{name}/) */
+  /** Phase 7 #46: 用户手动禁用的 Agent */
+  private disabledAgents = new Set<string>();
+
+  // ── Phase 7 #32: Agent 数据目录 ──
+
+  /** 获取 Agent 统一数据目录 (~/.agentRouter/.ag<name>/) */
   static getAgentDataDir(agentName: string): string {
-    return path.join(os.homedir(), '.agentrouter', 'agents', agentName);
+    return path.join(os.homedir(), '.agentRouter', `.ag${agentName}`);
   }
 
   /** 确保所有已注册 Agent 的数据目录存在 */
@@ -42,6 +56,22 @@ export class AgentManager {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
         console.log(`[AgentDir] Created data directory for "${name}": ${dir}`);
+      }
+    }
+  }
+
+  /** Phase 7 #33: 获取项目级 Agent 记忆目录 (<project>/.agentRouter/.ag<name>/) */
+  static getProjectAgentDataDir(projectPath: string, agentName: string): string {
+    return path.join(projectPath, '.agentRouter', `.ag${agentName}`);
+  }
+
+  /** Phase 7 #33: 确保项目级 Agent 记忆目录存在 */
+  ensureProjectAgentDataDirs(projectPath: string): void {
+    for (const name of this.adapters.keys()) {
+      const dir = AgentManager.getProjectAgentDataDir(projectPath, name);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`[AgentDir] Created project data directory for "${name}": ${dir}`);
       }
     }
   }
@@ -162,12 +192,21 @@ export class AgentManager {
         ...credentialsEnv,
       };
     }
-    // M4 #16: 注入 Agent 统一数据目录
+    // Phase 7 #32: 注入 Agent 统一数据目录
     const dataDir = AgentManager.getAgentDataDir(agentName);
     execOptions.env = {
       ...(execOptions.env ?? process.env),
       AGENTROUTER_AGENT_DATA_DIR: dataDir,
     };
+
+    // Phase 7 #33: 注入项目级 Agent 记忆目录
+    if (cwd) {
+      const projectDataDir = AgentManager.getProjectAgentDataDir(cwd, agentName);
+      execOptions.env = {
+        ...(execOptions.env ?? process.env),
+        AGENTROUTER_PROJECT_DATA_DIR: projectDataDir,
+      };
+    }
 
     const proc = adapter.spawnExec(command, execOptions);
 
@@ -335,6 +374,120 @@ export class AgentManager {
         resolve(code === 0 ? output : `Error (code=${code}): ${output}`);
       });
     });
+  }
+
+  // ── Phase 7 #46: 健康检查与禁用 ──
+
+  /** 对所有已注册 Agent 执行健康检查（带 5s 超时） */
+  async checkAllAgentsHealth(): Promise<AgentHealthStatus[]> {
+    const results: AgentHealthStatus[] = [];
+    const now = new Date().toISOString();
+
+    for (const name of this.adapters.keys()) {
+      if (this.disabledAgents.has(name)) continue;
+
+      let healthy = false;
+      let error: string | undefined;
+      try {
+        const result = await this.doctorWithTimeout(name, 5000);
+        healthy = result.success;
+        if (!result.success) error = result.error;
+      } catch (err) {
+        error = String(err);
+      }
+
+      const status: AgentHealthStatus = {
+        agentName: name,
+        healthy,
+        status: healthy ? 'healthy' : 'unhealthy',
+        error,
+        checkedAt: now,
+      };
+      this.agentHealth.set(name, status);
+      results.push(status);
+      console.log(`[AgentHealth] "${name}": ${healthy ? '✅ healthy' : '❌ unhealthy'}${error ? ' - ' + error : ''}`);
+    }
+    return results;
+  }
+
+  /** 带超时的 doctor 检查 */
+  private async doctorWithTimeout(agentName: string, timeoutMs: number): Promise<{ success: boolean; error?: string }> {
+    const adapter = this.adapters.get(agentName);
+    if (!adapter) return { success: false, error: 'Unknown agent' };
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        proc.kill('SIGKILL');
+        resolve({ success: false, error: `Timeout (${timeoutMs}ms)` });
+      }, timeoutMs);
+
+      const proc = adapter.spawnDoctor();
+      proc.on('error', (err) => {
+        clearTimeout(timer);
+        resolve({ success: false, error: err.message });
+      });
+      proc.on('close', (code) => {
+        clearTimeout(timer);
+        resolve({ success: code === 0, error: code !== 0 ? `Exit code ${code}` : undefined });
+      });
+    });
+  }
+
+  /** 获取单个 Agent 健康状态 */
+  getAgentHealth(agentName: string): AgentHealthStatus | null {
+    return this.agentHealth.get(agentName) ?? null;
+  }
+
+  /** 获取所有 Agent 健康状态 */
+  getAllAgentsHealth(): AgentHealthStatus[] {
+    const results: AgentHealthStatus[] = [];
+    for (const name of this.adapters.keys()) {
+      const health = this.agentHealth.get(name);
+      if (health) {
+        results.push(health);
+      } else {
+        results.push({
+          agentName: name,
+          healthy: false,
+          status: 'untested',
+          checkedAt: null,
+        });
+      }
+    }
+    return results;
+  }
+
+  /** 禁用 Agent（用户手动触发） */
+  disableAgent(agentName: string): void {
+    this.disabledAgents.add(agentName);
+    this.agentHealth.set(agentName, {
+      agentName,
+      healthy: false,
+      status: 'disabled',
+      checkedAt: new Date().toISOString(),
+    });
+  }
+
+  /** 启用 Agent */
+  enableAgent(agentName: string): void {
+    this.disabledAgents.delete(agentName);
+    // 清除旧状态，下次 doctor 重新检测
+    this.agentHealth.delete(agentName);
+  }
+
+  /** 获取包含健康状态的 Agent 列表（替代 list()） */
+  listWithHealth(): Array<{
+    name: string;
+    label: string;
+    manifest: import('./adapter').AgentManifest;
+    health: AgentHealthStatus | null;
+  }> {
+    return Array.from(this.adapters.values()).map(a => ({
+      name: a.name,
+      label: a.displayName,
+      manifest: a.manifest(),
+      health: this.agentHealth.get(a.name) ?? null,
+    }));
   }
 
   // ── 私有方法 ──

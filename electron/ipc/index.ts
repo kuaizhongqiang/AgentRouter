@@ -15,7 +15,7 @@ export function registerAllHandlers(
   manager: AgentManager,
   mainWindow: BrowserWindow
 ): void {
-  registerProjectHandlers(ipcMain);
+  registerProjectHandlers(ipcMain, manager);
   registerSessionHandlers(ipcMain);
   registerMessageHandlers(ipcMain);
   registerTaskHandlers(ipcMain);

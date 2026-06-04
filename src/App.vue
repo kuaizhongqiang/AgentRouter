@@ -56,7 +56,12 @@
       <div class="toolbar" v-if="currentProject">
         <div class="toolbar-item">
           <select v-model="selectedAgent" class="toolbar-select agent-select">
-            <option v-for="a in agents" :key="a.name" :value="a.name" :title="a.manifest?.tagline || ''">{{ a.label || a.name }}</option>
+            <option v-for="a in agents" :key="a.name" :value="a.name"
+              :disabled="a.health && !a.health.healthy"
+              :title="(a.health && !a.health.healthy ? '⚠️ ' + (a.health.error || '不可用') + ' — ' : '') + (a.manifest?.tagline || '')">
+              {{ a.label || a.name }}
+              {{ a.health ? (a.health.healthy ? '✅' : '❌') : '' }}
+            </option>
           </select>
           <span v-if="selectedAgentManifest?.tagline" class="agent-tagline" :title="selectedAgentManifest.tagline">{{ selectedAgentManifest.tagline }}</span>
         </div>
@@ -379,6 +384,10 @@ const agent = window.agent
 const db = window.db
 const notification = window.notification
 
+// Phase 7 #48: 启动状态
+const startupPhase = ref('')
+const startupMessage = ref('')
+
 const projects = ref([])
 const sessions = ref([])
 const messages = ref([])
@@ -681,9 +690,18 @@ const suggestionPaused = ref(false)
 
 // ── Agent 与模式 ──
 const agents = ref([])
-const selectedAgent = ref(null)
-const selectedMode = ref('对话')
+// Phase 7 #40: 从 localStorage 恢复上次选择的 Agent 和模式
+const selectedAgent = ref(localStorage.getItem('settings_defaultAgent') || null)
+const selectedMode = ref(localStorage.getItem('settings_defaultMode') || '对话')
 const modes = ['对话', 'PM 拆解', 'YOLO', '审批', '逐步', '预览', '代码审查']
+
+// Phase 7 #40: Agent/模式选择变化时持久化到 localStorage
+watch(selectedAgent, (val) => {
+  if (val) localStorage.setItem('settings_defaultAgent', val)
+})
+watch(selectedMode, (val) => {
+  if (val) localStorage.setItem('settings_defaultMode', val)
+})
 
 // PM 拆解模式自动切换到有 can_suggest 能力的 Agent
 watch(selectedMode, (newMode) => {
@@ -715,6 +733,10 @@ async function selectProject(p) {
   sessionTokenUsage.value = null
   sessions.value = await db.listSessions(p.id)
   tasks.value = await db.listTasks(p.id)
+  // Phase 7 #33: 选择项目时初始化 Agent 记忆目录
+  if (p.path && db.initAgentDirs) {
+    db.initAgentDirs(p.path).catch((err) => console.warn('[Project] Failed to init agent dirs:', err))
+  }
 }
 
 async function createProject() {
@@ -1108,12 +1130,33 @@ onMounted(async () => {
       agentStatus.value = (st === 'completed' || st === 'killed') ? 'online' : st
     })
     try {
-      agents.value = await agent.list() || []
+      // Phase 7 #46: 使用含健康状态的列表
+      if (agent.listWithHealth) {
+        agents.value = await agent.listWithHealth() || []
+      } else {
+        agents.value = await agent.list() || []
+      }
     } catch (_) {
-      agents.value = [{ name: 'codewhale', label: 'CodeWhale' }]
+      agents.value = [{ name: 'codewhale', label: 'CodeWhale', health: null }]
     }
-    if (agents.value.length > 0) {
+    // Phase 7 #46: 启动时对所有 Agent 执行健康检查（不阻塞）
+    if (agent.checkHealth) {
+      agent.checkHealth().then(healthResults => {
+        if (healthResults && Array.isArray(healthResults)) {
+          for (const h of healthResults) {
+            const existing = agents.value.find(a => a.name === h.agentName)
+            if (existing) existing.health = h
+          }
+        }
+      }).catch((err) => console.warn('[Health] Check failed:', err))
+    }
+    // Phase 7 #40: 恢复上次选择的 Agent；如果 localStorage 无值或已不存在，回退到第一个
+    const savedAgent = localStorage.getItem('settings_defaultAgent')
+    if (savedAgent && agents.value.some(a => a.name === savedAgent)) {
+      selectedAgent.value = savedAgent
+    } else if (agents.value.length > 0) {
       selectedAgent.value = agents.value[0].name || agents.value[0]
+      localStorage.setItem('settings_defaultAgent', selectedAgent.value)
     } else {
       selectedAgent.value = 'codewhale'
     }
@@ -1127,6 +1170,16 @@ onMounted(async () => {
         clearInterval(checkStatus)
       }
     }, 500)
+    // Phase 7 #48: 监听启动进度
+    if (agent.onStartup) {
+      agent.onStartup((data) => {
+        if (data && typeof data === 'object') {
+          const d = data
+          startupPhase.value = d.phase || ''
+          startupMessage.value = d.message || ''
+        }
+      })
+    }
   }
 })
 </script>

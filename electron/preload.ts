@@ -33,6 +33,21 @@ contextBridge.exposeInMainWorld('agent', {
   /** Phase 3: 获取 Agent 标签声明 */
   getManifest: (agentName: string) => ipcRenderer.invoke('agent:manifest', agentName),
 
+  /** Phase 7 #46: 获取所有 Agent 健康状态 */
+  getHealth: () => ipcRenderer.invoke('agent:health'),
+
+  /** Phase 7 #46: 对所有 Agent 执行健康检查 */
+  checkHealth: () => ipcRenderer.invoke('agent:health:check'),
+
+  /** Phase 7 #46: 禁用 Agent */
+  disable: (agentName: string) => ipcRenderer.invoke('agent:disable', agentName),
+
+  /** Phase 7 #46: 启用 Agent */
+  enable: (agentName: string) => ipcRenderer.invoke('agent:enable', agentName),
+
+  /** Phase 7 #46: 获取含健康状态的 Agent 列表 */
+  listWithHealth: () => ipcRenderer.invoke('agent:listWithHealth'),
+
   /** Phase 5: 审批/拒绝 suggestion */
   respondSuggestion: (sessionId: string, approved: boolean) =>
     ipcRenderer.invoke('agent:suggestion:respond', sessionId, approved),
@@ -54,13 +69,20 @@ contextBridge.exposeInMainWorld('agent', {
   },
 
   /**
-   * 监听 Agent 状态事件
+   * 监听 Agent 状态事件（含 Phase 7 启动进度）
    * @returns 取消监听的函数
    */
   onStatus: (fn: (data: unknown) => void) => {
     const handler = (_e: IpcRendererEvent, data: unknown) => fn(data);
     ipcRenderer.on('agent:status', handler);
     return () => ipcRenderer.removeListener('agent:status', handler);
+  },
+
+  /** Phase 7 #48: 监听启动进度事件 */
+  onStartup: (fn: (data: unknown) => void) => {
+    const handler = (_e: IpcRendererEvent, data: unknown) => fn(data);
+    ipcRenderer.on('app:startup', handler);
+    return () => ipcRenderer.removeListener('app:startup', handler);
   },
 });
 
@@ -128,6 +150,9 @@ contextBridge.exposeInMainWorld('db', {
   getProjectConfig: (projectPath: string) => ipcRenderer.invoke('project:getConfig', projectPath),
   setProjectConfig: (projectPath: string, config: unknown) =>
     ipcRenderer.invoke('project:setConfig', projectPath, config),
+
+  /** Phase 7 #33: 初始化项目级 Agent 记忆目录 */
+  initAgentDirs: (projectPath: string) => ipcRenderer.invoke('project:initAgentDirs', projectPath),
 });
 
 // ── Credentials API ──

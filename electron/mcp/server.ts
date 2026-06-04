@@ -89,6 +89,63 @@ const tools = {
 
     return { data: markdown, contentLength: markdown.length, url };
   },
+
+  // ── Phase 7 #36: Wiki 工具（通过 LeafWiki HTTP API）──
+
+  'wiki.read': async (args: { page?: string; wikiHost?: string }) => {
+    const host = args.wikiHost || 'http://127.0.0.1:18963';
+    const page = args.page || 'index';
+    try {
+      const res = await fetch(`${host}/api/page/${encodeURIComponent(page)}`);
+      if (!res.ok) return { data: null, error: `Wiki page not found (HTTP ${res.status})` };
+      const json = await res.json();
+      return { data: json.content || '', meta: json.meta };
+    } catch (err) {
+      return { data: null, error: `Wiki unavailable: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  },
+
+  'wiki.write': async (args: { page?: string; content?: string; wikiHost?: string }) => {
+    const host = args.wikiHost || 'http://127.0.0.1:18963';
+    const page = args.page || 'index';
+    if (!args.content) return { data: null, error: 'content is required' };
+    try {
+      const res = await fetch(`${host}/api/page/${encodeURIComponent(page)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: args.content }),
+      });
+      if (!res.ok) return { data: null, error: `Wiki write failed (HTTP ${res.status})` };
+      return { written: true, page };
+    } catch (err) {
+      return { data: null, error: `Wiki unavailable: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  },
+
+  'wiki.search': async (args: { query?: string; wikiHost?: string }) => {
+    const host = args.wikiHost || 'http://127.0.0.1:18963';
+    try {
+      const q = args.query || '';
+      const res = await fetch(`${host}/api/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) return { data: null, error: `Wiki search failed (HTTP ${res.status})` };
+      const json = await res.json();
+      return { matches: json.results || [], total: json.total || 0 };
+    } catch (err) {
+      return { data: null, error: `Wiki unavailable: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  },
+
+  'wiki.list': async (args: { wikiHost?: string }) => {
+    const host = args.wikiHost || 'http://127.0.0.1:18963';
+    try {
+      const res = await fetch(`${host}/api/pages`);
+      if (!res.ok) return { data: null, error: `Wiki list failed (HTTP ${res.status})` };
+      const json = await res.json();
+      return { pages: json.pages || [], total: json.total || 0 };
+    } catch (err) {
+      return { data: null, error: `Wiki unavailable: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  },
 };
 
 function respond(res: McpResponse): void {
