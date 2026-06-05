@@ -77,6 +77,13 @@ export default {
     suggestion: 'Agent 正在提建议...',
     approve: '采纳',
     reject: '拒绝',
+    searchPlaceholder: '搜索任务...',
+    allStatus: '全部状态',
+    templates: '模板',
+    saveAsTemplate: '存为模板',
+    templateNamePlaceholder: '模板名称',
+    templateDescPlaceholder: '模板描述（可选）',
+    noTemplates: '暂无模板',
   },
 
   review: {

@@ -223,8 +223,19 @@
 
       <!-- 任务标签页 -->
       <template v-if="rightTab === 'tasks'">
+      <!-- Issue #2: 任务筛选 -->
+      <div class="task-filter-bar">
+        <input v-model="taskFilter" class="task-filter-input" :placeholder="$t('tasks.searchPlaceholder')" />
+        <select v-model="taskStatusFilter" class="task-filter-select">
+          <option value="">{{ $t('tasks.allStatus') }}</option>
+          <option value="pending">{{ $t('tasks.pending') }}</option>
+          <option value="running">{{ $t('tasks.running') }}</option>
+          <option value="completed">{{ $t('tasks.completed') }}</option>
+          <option value="archived">{{ $t('tasks.archived') }}</option>
+        </select>
+      </div>
       <div class="task-list">
-        <div v-for="t in tasks" :key="t.id" class="task-item" :class="[t.status, t.status === 'running' ? 'running-anim' : '']" @click="toggleTask(t.id)">
+        <div v-for="t in filteredTasks" :key="t.id" class="task-item" :class="[t.status, t.status === 'running' ? 'running-anim' : '']" @click="toggleTask(t.id)">
           <span class="task-icon">
             <!-- pending -->
             <svg v-if="t.status === 'pending'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -271,6 +282,34 @@
         </div>
       </div>
       <div class="placeholder small" v-if="tasks.length === 0">{{ $t('tasks.empty') }}</div>
+
+      <!-- Issue #19: 任务模板 -->
+      <div class="template-bar">
+        <button class="template-toggle" @click="showTemplatePanel = !showTemplatePanel; if (showTemplatePanel) loadTemplates()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          {{ $t('tasks.templates') }}
+        </button>
+        <button class="template-save-btn" @click="showSaveTemplate = true" :disabled="tasks.length === 0">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          {{ $t('tasks.saveAsTemplate') }}
+        </button>
+      </div>
+      <div v-if="showTemplatePanel" class="template-panel">
+        <div v-if="showSaveTemplate" class="template-save-form">
+          <input v-model="templateName" :placeholder="$t('tasks.templateNamePlaceholder')" />
+          <input v-model="templateDesc" :placeholder="$t('tasks.templateDescPlaceholder')" />
+          <button @click="saveTemplate" class="btn-approve" style="width:100%;margin-top:6px">{{ $t('common.save') }}</button>
+          <button @click="showSaveTemplate = false; templateName = ''; templateDesc = ''" class="btn-back" style="width:100%;margin-top:4px">{{ $t('common.cancel') }}</button>
+        </div>
+        <div v-for="tpl in templates" :key="tpl.id" class="template-item">
+          <div class="template-item-header">
+            <span class="template-item-name">{{ tpl.name }}</span>
+            <button class="template-delete-btn" @click="deleteTemplate(tpl.id)">✕</button>
+          </div>
+          <p class="template-item-desc">{{ tpl.description }}</p>
+        </div>
+        <div class="placeholder small" v-if="templates.length === 0 && !showSaveTemplate">{{ $t('tasks.noTemplates') }}</div>
+      </div>
       </template>
 
       <!-- Diff 标签页 -->
@@ -717,9 +756,27 @@ function onOnboardingFinished() {
 // ── Mission 模式状态 ──
 const expandedTask = ref(null)
 const taskLogs = ref({})
+const taskFilter = ref('')
+const taskStatusFilter = ref('')
+const filteredTasks = computed(() => {
+  let list = tasks.value
+  if (taskStatusFilter.value) {
+    list = list.filter(t => t.status === taskStatusFilter.value)
+  }
+  if (taskFilter.value.trim()) {
+    const q = taskFilter.value.trim().toLowerCase()
+    list = list.filter(t => t.title.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q))
+  }
+  return list
+})
 const showApproveButton = ref(false)
 const showSummarizeButton = ref(false)
 const showSuggestion = ref(false)
+const showTemplatePanel = ref(false)
+const showSaveTemplate = ref(false)
+const templates = ref([])
+const templateName = ref('')
+const templateDesc = ref('')
 const suggestionPaused = ref(false)
 
 // ── Agent 与模式 ──
@@ -964,6 +1021,41 @@ function doctor() { if (selectedAgent.value) agent.doctor(selectedAgent.value) }
 
 function toggleTask(id) {
   expandedTask.value = expandedTask.value === id ? null : id
+}
+
+// ── Issue #19: 任务模板 ──
+async function loadTemplates() {
+  try {
+    templates.value = await window.taskTemplate.list()
+  } catch (e) {
+    templates.value = []
+  }
+}
+async function saveTemplate() {
+  const name = templateName.value.trim()
+  if (!name) return
+  const desc = templateDesc.value.trim()
+  const taskData = JSON.stringify(tasks.value.map(t => ({
+    title: t.title, assignee: t.assignee, description: t.description
+  })))
+  try {
+    await window.taskTemplate.create(name, desc, taskData)
+    templateName.value = ''
+    templateDesc.value = ''
+    showSaveTemplate.value = false
+    await loadTemplates()
+  } catch (e) {
+    console.error('[Template] Save failed:', e)
+  }
+}
+async function deleteTemplate(id) {
+  if (!confirm('确定要删除此模板？')) return
+  try {
+    await window.taskTemplate.delete(id)
+    await loadTemplates()
+  } catch (e) {
+    console.error('[Template] Delete failed:', e)
+  }
 }
 
 async function approvePlan() {
@@ -1728,6 +1820,51 @@ body {
 .btn-mini:hover { color: var(--color-text); border-color: var(--color-text-secondary); }
 
 /* ═══ 任务列表 ═══ */
+.task-filter-bar {
+  display: flex; gap: 4px; padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+.task-filter-input {
+  flex: 1; padding: 4px 6px; font-size: 11px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--bg-input); color: var(--color-text); outline: none;
+}
+.task-filter-input:focus { border-color: var(--color-accent); }
+.task-filter-select {
+  width: 72px; padding: 4px; font-size: 11px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--bg-input); color: var(--color-text); outline: none;
+}
+.template-bar {
+  display: flex; gap: 4px; padding: 4px 8px;
+  border-top: 1px solid var(--color-border);
+}
+.template-toggle, .template-save-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 4px; font-size: 10px; border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); background: var(--bg-input);
+  color: var(--color-text-secondary); cursor: pointer;
+}
+.template-toggle:hover, .template-save-btn:hover:not(:disabled) { border-color: var(--color-accent); color: var(--color-text); }
+.template-save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.template-panel { padding: 4px 8px; border-top: 1px solid var(--color-border); }
+.template-save-form { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.template-save-form input {
+  padding: 4px 6px; font-size: 11px; border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); background: var(--bg-input); color: var(--color-text); outline: none;
+}
+.template-item {
+  padding: 6px 4px; border-bottom: 1px solid var(--color-border);
+  cursor: pointer; transition: background var(--transition);
+}
+.template-item:hover { background: var(--bg-sidebar-hover); }
+.template-item-header { display: flex; justify-content: space-between; align-items: center; }
+.template-item-name { font-size: 12px; font-weight: 600; color: var(--color-text); }
+.template-item-desc { font-size: 10px; color: var(--color-text-muted); margin: 2px 0 0; }
+.template-delete-btn {
+  background: none; border: none; color: var(--color-text-muted); cursor: pointer; font-size: 10px; padding: 2px;
+}
+.template-delete-btn:hover { color: #f44336; }
 .task-list { flex: 1; overflow-y: auto; padding: 4px 0; }
 .task-item {
   display: flex; align-items: flex-start; gap: 8px;

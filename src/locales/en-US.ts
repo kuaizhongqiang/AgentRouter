@@ -76,6 +76,13 @@ export default {
     suggestion: 'Agent is suggesting...',
     approve: 'Accept',
     reject: 'Reject',
+    searchPlaceholder: 'Search tasks...',
+    allStatus: 'All status',
+    templates: 'Templates',
+    saveAsTemplate: 'Save as template',
+    templateNamePlaceholder: 'Template name',
+    templateDescPlaceholder: 'Template description (optional)',
+    noTemplates: 'No templates',
   },
 
   review: {

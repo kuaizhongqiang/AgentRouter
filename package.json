@@ -1,9 +1,16 @@
 {
   "name": "agent-router",
-  "private": true,
   "version": "0.1.0",
   "type": "module",
   "main": "dist-electron/main.js",
+  "bin": {
+    "ar": "./cli/bin/ar.mjs"
+  },
+  "files": [
+    "cli/",
+    "dist-electron/",
+    "dist/"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -41,6 +48,8 @@
   },
   "dependencies": {
     "diff": "^9.0.0",
+    "highlight.js": "^11.11.1",
+    "marked": "^18.0.5",
     "pinia": "^3.0.4",
     "splitpanes": "^4.1.2",
     "sql.js": "^1.14.1",
