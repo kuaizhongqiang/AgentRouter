@@ -56,7 +56,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Download Electron binary
-        run: npx electron --version
+        run: node node_modules/electron/install.js
 
       - name: Build all
         run: |
