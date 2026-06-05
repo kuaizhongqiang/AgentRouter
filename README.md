@@ -12,7 +12,7 @@ AgentRouter 将 6 个 AI 编码 CLI 工具集成到一个 Electron + Vue 3 桌�
 
 ```bash
 # CLI 工具（推荐）
-npm install -g agent-router
+npm install -g @kuaizhongqiang/agent-router
 
 # 或下载桌面端安装包
 # 从 GitHub Releases 下载 AgentRouter-*.exe
