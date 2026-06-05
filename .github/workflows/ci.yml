@@ -70,15 +70,18 @@ jobs:
       - name: Build Electron package
         run: npm run electron:build
 
+      # ── Package Electron build ──
+      - name: Package Electron app
+        shell: pwsh
+        run: Compress-Archive -Path release/win-unpacked/* -DestinationPath release/AgentRouter-${{ github.ref_name }}-win-x64.zip -Force
+
       # ── GitHub Release ──
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: AgentRouter ${{ github.ref_name }}
           body_path: CHANGELOG.md
-          files: |
-            dist/AgentRouter-*.exe
-            dist/AgentRouter-*.yml
+          files: release/AgentRouter-*.zip
 
       # ── npm publish (CLI) ──
       - name: Set npm version
