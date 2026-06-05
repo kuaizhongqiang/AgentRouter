@@ -114,6 +114,15 @@ group('CLI 文件完整性');
     'cli/commands/memory.mjs',
     'cli/commands/replay.mjs',
     'cli/commands/status.mjs',
+    'cli/commands/build.mjs',
+    'cli/commands/test.mjs',
+    'cli/commands/log.mjs',
+    'cli/commands/db.mjs',
+    'cli/commands/git.mjs',
+    'cli/commands/diag.mjs',
+    'cli/commands/clean.mjs',
+    'cli/commands/env.mjs',
+    'cli/commands/watch.mjs',
   ];
 
   for (const f of requiredFiles) {
@@ -306,3 +315,67 @@ console.log(`  Rate:   ${(passCount / total * 100).toFixed(1)}%`);
 console.log();
 
 process.exit(failCount > 0 ? 1 : 0);
+
+group('env 命令 (Issue #59)');
+
+(function testEnv() {
+  const r = run(['env'], { timeout: 15000 });
+  assertEq(r.status, 0, 'ar env exits 0');
+  assertIncludes(r.stdout, 'Node.js', 'env shows Node.js section');
+
+  const json = run(['env', '--json'], { timeout: 15000 });
+  assertEq(json.status, 0, 'ar env --json exits 0');
+  try {
+    JSON.parse(json.stdout);
+    assert(true, 'env --json output is valid JSON');
+  } catch {
+    assert(false, 'env --json output is valid JSON');
+  }
+})();
+
+group('git 命令 (Issue #59)');
+
+(function testGit() {
+  const r = run(['git', 'status'], { timeout: 10000 });
+  assertEq(r.status, 0, 'ar git status exits 0');
+  assertIncludes(r.stdout, 'cli/', 'git status shows changed files');
+})();
+
+group('db 命令 (Issue #59)');
+
+(function testDb() {
+  const stats = run(['db', 'stats'], { timeout: 15000 });
+  assertEq(stats.status, 0, 'ar db stats exits 0');
+  assertIncludes(stats.stdout, 'projects', 'db stats shows projects table');
+
+  const tables = run(['db', '--tables'], { timeout: 10000 });
+  assertEq(tables.status, 0, 'ar db --tables exits 0');
+
+  const query = run(['db', "SELECT count(*) as total FROM projects"], { timeout: 10000 });
+  assertEq(query.status, 0, 'ar db SQL query exits 0');
+  assertIncludes(query.stdout, 'total', 'db query shows column header');
+})();
+
+group('clean 命令 (Issue #59)');
+
+(function testClean() {
+  const dry = run(['clean', '--dry-run'], { timeout: 10000 });
+  assertEq(dry.status, 0, 'ar clean --dry-run exits 0');
+  assertIncludes(dry.stdout, 'dist-electron', 'dry-run shows dist-electron path');
+})();
+
+group('diag 命令 (Issue #59)');
+
+(function testDiag() {
+  const r = run(['diag', '--env'], { timeout: 15000 });
+  assertEq(r.status, 0, 'ar diag --env exits 0');
+  assertIncludes(r.stdout, 'Node.js', 'diag shows Node.js info');
+})();
+
+group('log 命令 (Issue #59)');
+
+(function testLog() {
+  // Just test help and basic usage, actual log reading depends on data
+  const r = run(['log', 'codewhale', '--lines', '3'], { timeout: 15000 });
+  assertEq(r.status, 0, 'ar log codewhale exits 0');
+})();

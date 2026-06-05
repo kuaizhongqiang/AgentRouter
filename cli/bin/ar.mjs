@@ -165,6 +165,55 @@ async function main() {
       break;
     }
 
+    // ── 日志 (Issue #59) ──
+    case 'log': {
+      const { default: handler } = await import('../commands/log.mjs');
+      await handler(positional.slice(1), options);
+      break;
+    }
+
+    // ── 数据库 (Issue #59) ──
+    case 'db': {
+      const { default: handler } = await import('../commands/db.mjs');
+      await handler(positional.slice(1), options);
+      break;
+    }
+
+    // ── Git (Issue #59) ──
+    case 'git': {
+      const { default: handler } = await import('../commands/git.mjs');
+      await handler(positional.slice(1), options);
+      break;
+    }
+
+    // ── 深度诊断 (Issue #59) ──
+    case 'diag': {
+      const { default: handler } = await import('../commands/diag.mjs');
+      await handler(positional.slice(1), options);
+      break;
+    }
+
+    // ── 清理 (Issue #59) ──
+    case 'clean': {
+      const { default: handler } = await import('../commands/clean.mjs');
+      await handler(positional.slice(1), options);
+      break;
+    }
+
+    // ── 环境信息 (Issue #59) ──
+    case 'env': {
+      const { default: handler } = await import('../commands/env.mjs');
+      await handler(positional.slice(1), options);
+      break;
+    }
+
+    // ── 监听模式 (Issue #59) ──
+    case 'watch': {
+      const { default: handler } = await import('../commands/watch.mjs');
+      await handler(positional.slice(1), options);
+      break;
+    }
+
     // ── list 简写 ──
     case 'list':
     case 'ls': {

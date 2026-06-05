@@ -135,6 +135,13 @@ Agent 管理:
   token usage|stats        Token 用量
   memory list|get|set|rm   记忆操作
   replay <session>         Session 回放
+  log <agent>              查看 Agent 日志
+  db <sql>                 直接查询数据库
+  git diff|log|status      Git 操作
+  diag                     深度诊断
+  env                      环境信息
+  clean                    清理构建产物
+  watch                    监听文件变化
   version                  显示版本
   help [command]           显示帮助
 
