@@ -209,7 +209,7 @@ export function runMigrations(db: Database): void {
 
       // 记录迁移
       db.run('INSERT INTO _migrations (id, name) VALUES (?, ?)', [m.id, m.name]);
-      console.log(`[DB] Migration applied: ${m.name}`);
+      console.error(`[DB] Migration applied: ${m.name}`);
     } catch (err) {
       console.error(`[DB] Migration failed: ${m.name}`, err);
       throw err;
