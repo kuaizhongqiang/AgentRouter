@@ -41,12 +41,33 @@ export async function getDatabase(): Promise<SqlJsDatabase> {
   return db;
 }
 
+// ── saveDatabase 去抖 ──
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+const SAVE_DEBOUNCE_MS = 300;
+
 /**
- * 持久化数据库到磁盘
+ * 持久化数据库到磁盘（去抖 300ms，批量操作只写一次）
  */
 export function saveDatabase(): void {
-  if (!db || !DB_PATH) return;
-  const data = db.export();
+  const dbRef = db;
+  if (!dbRef || !DB_PATH) return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const data = dbRef.export();
+    fs.writeFileSync(DB_PATH, Buffer.from(data));
+    saveTimer = null;
+  }, SAVE_DEBOUNCE_MS);
+}
+
+/**
+ * 立即持久化（不等待去抖），用于进程退出前的最后保存
+ */
+export function flushDatabase(): void {
+  const dbRef = db;
+  if (!dbRef || !DB_PATH) return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  const data = dbRef.export();
   fs.writeFileSync(DB_PATH, Buffer.from(data));
 }
 

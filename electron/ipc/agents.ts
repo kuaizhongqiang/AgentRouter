@@ -13,10 +13,13 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+type SafeHandle = (ipcMain: IpcMain, channel: string, handler: (...args: any[]) => Promise<any>) => void;
+
 export function registerAgentHandlers(
   ipcMain: IpcMain,
   manager: AgentManager,
-  mainWindow: BrowserWindow
+  mainWindow: BrowserWindow,
+  safeHandle?: SafeHandle
 ): void {
   // 追踪活跃执行上下文（用于任务解析）
   const activeContexts = new Map<string, { sessionId: string; projectId: string; mode?: string }>();
@@ -93,7 +96,9 @@ export function registerAgentHandlers(
     }
   });
 
-  ipcMain.handle('agent:exec', async (_e, payload: {
+  const h = safeHandle ?? ((ipc, channel, handler) => ipc.handle(channel, handler));
+
+  h(ipcMain, 'agent:exec', async (_e, payload: {
     agentName: string;
     command: string;
     sessionId: string;
@@ -114,47 +119,47 @@ export function registerAgentHandlers(
     }
   });
 
-  ipcMain.handle('agent:list', async () => {
+  h(ipcMain, 'agent:list', async () => {
     return manager.list();
   });
 
-  ipcMain.handle('agent:kill', async (_e, agentName?: string) => {
+  h(ipcMain, 'agent:kill', async (_e, agentName?: string) => {
     manager.kill(agentName);
   });
 
-  ipcMain.handle('agent:doctor', async (_e, agentName: string) => {
+  h(ipcMain, 'agent:doctor', async (_e, agentName: string) => {
     return manager.doctor(agentName);
   });
 
   // Phase 3: 获取 Agent 标签声明
-  ipcMain.handle('agent:manifest', async (_e, agentName: string) => {
+  h(ipcMain, 'agent:manifest', async (_e, agentName: string) => {
     return manager.getManifest(agentName);
   });
 
   // Phase 7 #46: Agent 健康检查与禁用
-  ipcMain.handle('agent:health', async () => {
+  h(ipcMain, 'agent:health', async () => {
     return manager.getAllAgentsHealth();
   });
 
-  ipcMain.handle('agent:health:check', async () => {
+  h(ipcMain, 'agent:health:check', async () => {
     return manager.checkAllAgentsHealth();
   });
 
-  ipcMain.handle('agent:disable', async (_e, agentName: string) => {
+  h(ipcMain, 'agent:disable', async (_e, agentName: string) => {
     manager.disableAgent(agentName);
   });
 
-  ipcMain.handle('agent:enable', async (_e, agentName: string) => {
+  h(ipcMain, 'agent:enable', async (_e, agentName: string) => {
     manager.enableAgent(agentName);
   });
 
   // Phase 7 #46: 含健康状态的 Agent 列表
-  ipcMain.handle('agent:listWithHealth', async () => {
+  h(ipcMain, 'agent:listWithHealth', async () => {
     return manager.listWithHealth();
   });
 
   // Phase 6: Session 回放 — 读取 .jsonl 事件文件并逐行返回
-  ipcMain.handle('agent:replay', async (_e, sessionId: string, projectId: string) => {
+  h(ipcMain, 'agent:replay', async (_e, sessionId: string, projectId: string) => {
     const eventsDir = path.join(os.homedir(), '.agentrouter', 'projects', projectId, 'sessions', sessionId, 'events');
     if (!fs.existsSync(eventsDir)) return [];
 
@@ -175,13 +180,13 @@ export function registerAgentHandlers(
   });
 
   // M2: Issue #20 — 从 messages 表读取回放数据
-  ipcMain.handle('replay:getMessages', async (_e, sessionId: string) => {
+  h(ipcMain, 'replay:getMessages', async (_e, sessionId: string) => {
     const { getMessagesBySession } = await import('../database/repository');
     return getMessagesBySession(sessionId);
   });
 
   // — 斜杠命令列表
-  ipcMain.handle('agent:commands', async () => {
+  h(ipcMain, 'agent:commands', async () => {
     return [
       { name: '/fix', description: '修复 Bug', detail: '分析代码并自动修复缺陷' },
       { name: '/feat', description: '添加功能', detail: '根据需求实现新功能' },
@@ -193,27 +198,24 @@ export function registerAgentHandlers(
   });
 
   // Phase 5: 用户审批或拒绝 suggestion
-  ipcMain.handle('agent:suggestion:respond', async (_e, sessionId: string, approved: boolean) => {
+  h(ipcMain, 'agent:suggestion:respond', async (_e, sessionId: string, approved: boolean) => {
     if (approved) {
-      // 用户采纳 → 转发 suggestion 到 PM
       manager.writeToPm(sessionId, { type: 'event', event: 'suggestion:approved', data: {} });
     } else {
-      // 用户拒绝 → 通知 PM 忽略
       manager.writeToPm(sessionId, { type: 'event', event: 'suggestion:rejected', data: {} });
     }
-    // 通知前端恢复执行
     if (!mainWindow.isDestroyed()) {
       mainWindow.webContents.send('agent:output', { _meta: { resume: true, sessionId } });
     }
   });
 
   // M4 #8: Token 计费
-  ipcMain.handle('token:record', async (_e, sessionId: string, agentType: string, promptTokens: number, completionTokens: number, model: string) => {
+  h(ipcMain, 'token:record', async (_e, sessionId: string, agentType: string, promptTokens: number, completionTokens: number, model: string) => {
     const { recordTokenUsage } = await import('../database/repository');
     return recordTokenUsage(sessionId, agentType, promptTokens, completionTokens, model);
   });
 
-  ipcMain.handle('token:getUsage', async (_e, sessionId: string) => {
+  h(ipcMain, 'token:getUsage', async (_e, sessionId: string) => {
     const { getSessionTokenUsage } = await import('../database/repository');
     return getSessionTokenUsage(sessionId);
   });

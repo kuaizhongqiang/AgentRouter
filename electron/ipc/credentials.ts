@@ -6,18 +6,16 @@
 import type { IpcMain } from 'electron';
 import { getCredentials, setCredentials } from '../credentials';
 
-export function registerCredentialsHandlers(ipcMain: IpcMain): void {
-  /**
-   * 读取凭证
-   */
-  ipcMain.handle('credentials:get', () => {
+type SafeHandle = (ipcMain: IpcMain, channel: string, handler: (...args: any[]) => Promise<any>) => void;
+
+export function registerCredentialsHandlers(ipcMain: IpcMain, safeHandle?: SafeHandle): void {
+  const h = safeHandle ?? ((ipc, channel, handler) => ipc.handle(channel, handler));
+
+  h(ipcMain, 'credentials:get', async () => {
     return getCredentials();
   });
 
-  /**
-   * 保存凭证
-   */
-  ipcMain.handle('credentials:set', (_event, creds: { apiKey: string; baseUrl: string }) => {
+  h(ipcMain, 'credentials:set', async (_event, creds: { apiKey: string; baseUrl: string }) => {
     setCredentials({
       apiKey: creds.apiKey ?? '',
       baseUrl: creds.baseUrl ?? 'https://api.deepseek.com',

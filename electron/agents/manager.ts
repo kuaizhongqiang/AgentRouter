@@ -281,18 +281,32 @@ export class AgentManager {
           // 写入 .jsonl（带 _sender）
           logStream.write(JSON.stringify(enriched) + '\n');
 
-          // M4 #8: 从 completion 事件提取 token 用量并记录
-          if (event.event === 'completion') {
-            const usage = event.data?.usage as Record<string, unknown> | undefined;
-            if (usage && typeof usage === 'object') {
-              const promptTokens = typeof usage.promptTokens === 'number' ? usage.promptTokens
-                : typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0;
-              const completionTokens = typeof usage.completionTokens === 'number' ? usage.completionTokens
-                : typeof usage.completion_tokens === 'number' ? usage.completion_tokens : 0;
-              const model = String(event.data?.model || usage.model || '');
-              if (promptTokens > 0 || completionTokens > 0) {
-                this.recordTokenUsage(sessionId, agentName, promptTokens, completionTokens, model);
+          // M4 #8: 从 metadata 或 completion 事件提取 token 用量并记录
+          if (event.event === 'metadata' as any || event.event === 'completion') {
+            let promptTokens = 0, completionTokens = 0, model = '';
+
+            // 优先从 metadata.meta 读取（CodeWhale/Reasonix 格式）
+            const meta = (event.data as any)?.meta;
+            if (meta && typeof meta.input_tokens === 'number') {
+              promptTokens = meta.input_tokens;
+              completionTokens = meta.output_tokens || 0;
+              model = String(meta.model || '');
+            }
+
+            // 其次从 data.usage 读取（部分 Agent 格式）
+            if (!promptTokens && !completionTokens) {
+              const usage = (event.data as any)?.usage;
+              if (usage && typeof usage === 'object') {
+                promptTokens = typeof usage.promptTokens === 'number' ? usage.promptTokens
+                  : typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0;
+                completionTokens = typeof usage.completionTokens === 'number' ? usage.completionTokens
+                  : typeof usage.completion_tokens === 'number' ? usage.completion_tokens : 0;
+                model = String(event.data?.model || usage.model || '');
               }
+            }
+
+            if (promptTokens > 0 || completionTokens > 0) {
+              this.recordTokenUsage(sessionId, agentName, promptTokens, completionTokens, model);
             }
           }
 

@@ -46,14 +46,17 @@ function scanSourceFiles(dir: string, baseDir: string): Array<{ path: string; na
   return results;
 }
 
-export function registerProjectHandlers(ipcMain: IpcMain, manager?: AgentManager): void {
-  ipcMain.handle('db:listProjects', async () => {
+type SafeHandle = (ipcMain: IpcMain, channel: string, handler: (...args: any[]) => Promise<any>) => void;
+
+export function registerProjectHandlers(ipcMain: IpcMain, manager?: AgentManager, safeHandle?: SafeHandle): void {
+  const h = safeHandle ?? ((ipc, channel, handler) => ipc.handle(channel, handler));
+
+  h(ipcMain, 'db:listProjects', async () => {
     return repo.listProjects();
   });
 
-  ipcMain.handle('db:createProject', async (_e, name: string, projectPath: string) => {
+  h(ipcMain, 'db:createProject', async (_e, name: string, projectPath: string) => {
     const project = await repo.createProject(name, projectPath);
-    // Phase 7 #33: 创建项目时初始化 Agent 记忆目录
     if (manager) {
       try {
         manager.ensureProjectAgentDataDirs(projectPath);
@@ -64,16 +67,15 @@ export function registerProjectHandlers(ipcMain: IpcMain, manager?: AgentManager
     return project;
   });
 
-  ipcMain.handle('db:removeProject', async (_e, id: string) => {
+  h(ipcMain, 'db:removeProject', async (_e, id: string) => {
     return repo.removeProject(id);
   });
 
-  ipcMain.handle('db:getProject', async (_e, id: string) => {
+  h(ipcMain, 'db:getProject', async (_e, id: string) => {
     return repo.getProject(id);
   });
 
-  /** Phase 7 #33: 初始化项目级 Agent 记忆目录 */
-  ipcMain.handle('project:initAgentDirs', async (_e, projectPath: string) => {
+  h(ipcMain, 'project:initAgentDirs', async (_e, projectPath: string) => {
     if (manager) {
       manager.ensureProjectAgentDataDirs(projectPath);
       return { done: true };
@@ -81,13 +83,11 @@ export function registerProjectHandlers(ipcMain: IpcMain, manager?: AgentManager
     return { done: false, error: 'Manager not ready' };
   });
 
-  /** M3: 列出项目目录下的源文件树 */
-  ipcMain.handle('project:listSourceFiles', async (_e, projectPath: string) => {
+  h(ipcMain, 'project:listSourceFiles', async (_e, projectPath: string) => {
     return scanSourceFiles(projectPath, projectPath);
   });
 
-  /** M4 #11: 读取项目配置文件 */
-  ipcMain.handle('project:getConfig', async (_e, projectPath: string) => {
+  h(ipcMain, 'project:getConfig', async (_e, projectPath: string) => {
     const configPath = path.join(projectPath, CONFIG_FILENAME);
     try {
       if (!fs.existsSync(configPath)) {
@@ -101,8 +101,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, manager?: AgentManager
     }
   });
 
-  /** M4 #11: 写入项目配置文件 */
-  ipcMain.handle('project:setConfig', async (_e, projectPath: string, config: Record<string, unknown>) => {
+  h(ipcMain, 'project:setConfig', async (_e, projectPath: string, config: Record<string, unknown>) => {
     const configPath = path.join(projectPath, CONFIG_FILENAME);
     const merged = { ...DEFAULT_PROJECT_CONFIG, ...config };
     fs.writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf-8');

@@ -384,6 +384,30 @@ const agent = window.agent
 const db = window.db
 const notification = window.notification
 
+/** 聊天模式列表（这些模式不弹系统通知） */
+const CHAT_MODES = ['对话', 'PM 拆解']
+
+/** 将技术错误转为用户友好提示 */
+function formatError(msg) {
+  const map = {
+    ENOENT: '文件或目录不存在',
+    ECONNREFUSED: '连接被拒绝',
+    ECONNRESET: '连接被重置',
+    ETIMEDOUT: '连接超时',
+    EACCES: '权限不足',
+    ENOTFOUND: '网络连接失败',
+    ENOSPC: '磁盘空间不足',
+    'Unknown agent': '未知的 Agent',
+    'Session not found': '会话不存在',
+    'Project not found': '项目不存在',
+  }
+  for (const [key, friendly] of Object.entries(map)) {
+    if (msg && msg.includes(key)) return friendly
+  }
+  if (msg && msg.length > 80) return msg.slice(0, 77) + '...'
+  return msg || '未知错误'
+}
+
 // Phase 7 #48: 启动状态
 const startupPhase = ref('')
 const startupMessage = ref('')
@@ -750,6 +774,7 @@ async function createProject() {
 }
 
 async function removeProject(id) {
+  if (!confirm('确定要删除此项目？所有对话和任务将一并删除，此操作不可撤销。')) return
   await db.removeProject(id)
   if (currentProject.value?.id === id) {
     currentProject.value = null
@@ -798,6 +823,7 @@ async function createSession() {
 }
 
 async function removeSession(id) {
+  if (!confirm('确定要删除此对话？此操作不可撤销。')) return
   await db.removeSession(id)
   sessions.value = sessions.value.filter(s => s.id !== id)
   if (currentSession.value?.id === id) {
@@ -881,11 +907,13 @@ async function send() {
     // 检测完成事件
     if (data?.event?.event === 'completion' || data?.event?.event === 'error') {
       done = true
-      // Issue #9: 原生通知
-      if (data?.event?.event === 'completion') {
-        notification?.send('AgentRouter', t('notification.completed', { agent: selectedAgent.value }))
-      } else {
-        notification?.send('AgentRouter', t('notification.error', { agent: selectedAgent.value, error: data?.event?.data?.error || '未知错误' }))
+      // Issue #34: 聊天模式不弹系统通知
+      if (!CHAT_MODES.includes(selectedMode.value)) {
+        if (data?.event?.event === 'completion') {
+          notification?.send('AgentRouter', t('notification.completed', { agent: selectedAgent.value }))
+        } else {
+          notification?.send('AgentRouter', t('notification.error', { agent: selectedAgent.value, error: formatError(data?.event?.data?.error) }))
+        }
       }
     }
   })
@@ -893,7 +921,7 @@ async function send() {
   try {
     await agent.exec(selectedAgent.value, cmd, currentSession.value.id, currentProject.value?.id, selectedMode.value)
   } catch (err) {
-    reply += `\n[错误] ${err.message || err}`
+    reply += `\n[错误] ${formatError(err.message || err)}`
     done = true
   }
 
