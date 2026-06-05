@@ -56,6 +56,18 @@
           </div>
           <p v-if="createError" class="onboarding-error">{{ createError }}</p>
         </div>
+        <!-- API Key 配置（未配置时显示） -->
+        <div v-if="!hasCredentials" class="onboarding-api-section">
+          <div class="api-divider">
+            <span>{{ $t('onboarding.apiKey.optional') }}</span>
+          </div>
+          <div class="onboarding-form">
+            <label>{{ $t('onboarding.apiKey.key') }}</label>
+            <input v-model="apiKey" type="password" :placeholder="'sk-...'" @keydown.enter="projectName && projectPath && next" />
+            <label>{{ $t('onboarding.apiKey.baseUrl') }}</label>
+            <input v-model="apiBaseUrl" :placeholder="'https://api.deepseek.com'" @keydown.enter="projectName && projectPath && next" />
+          </div>
+        </div>
       </div>
 
       <!-- 步骤 3: 选择 Agent -->
@@ -137,6 +149,13 @@ const projectName = ref('')
 const projectPath = ref('')
 const selectedAgentName = ref('')
 const createError = ref('')
+const apiKey = ref('')
+const apiBaseUrl = ref('https://api.deepseek.com')
+const savingCredentials = ref(false)
+
+const hasCredentials = computed(() => {
+  return !!(window as any).credentials?.get()?.apiKey
+})
 
 const selectedAgentLabel = computed(() => {
   const a = props.agents.find(a => a.name === selectedAgentName.value)
@@ -157,6 +176,16 @@ function next() {
   if (!canProceed.value) return
 
   if (step.value === 2) {
+    // 保存 API Key（如果有输入）
+    if (apiKey.value.trim()) {
+      savingCredentials.value = true
+      try {
+        (window as any).credentials?.set({ apiKey: apiKey.value.trim(), baseUrl: apiBaseUrl.value.trim() || 'https://api.deepseek.com' })
+      } catch (e) {
+        console.warn('[Onboarding] Failed to save credentials:', e)
+      }
+      savingCredentials.value = false
+    }
     // 创建项目
     createError.value = ''
     emit('createProject', projectName.value.trim(), projectPath.value.trim())
@@ -318,6 +347,31 @@ defineExpose({ reset })
 }
 .path-input-row input {
   flex: 1;
+}
+
+.onboarding-api-section {
+  margin-top: 8px;
+  max-width: 380px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.api-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.api-divider::before,
+.api-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+.api-divider span {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .onboarding-error {

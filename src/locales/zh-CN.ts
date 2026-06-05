@@ -49,6 +49,7 @@ export default {
       pm: '输入需求，Reasonix (PM) 将拆解为任务...',
       codeReview: '输入要审查的文件路径，多个文件用逗号分隔，或输入审查关注点...',
     },
+    firstMessageHint: '💡 试试输入你的第一个需求，Agent 会帮你完成',
     noSession: '选择或新建一个对话',
     noProject: '请先选择一个项目',
     user: '你',

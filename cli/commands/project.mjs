@@ -56,6 +56,8 @@ export default async function handler(args, options) {
         return await removeProject(rest, options);
       case 'use':
         return await useProject(rest, options);
+      case 'init':
+        return await initProject(rest, options);
       case 'config':
         return await configProject(rest, options);
       default:
@@ -310,4 +312,32 @@ async function configSet(args, options) {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
 
   output.success(`配置项 "${key}" 已设置`);
+}
+
+async function initProject(args, options) {
+  const { repos, projectInit } = getModules();
+  const [projectId] = args;
+
+  if (!projectId) {
+    output.fatal('用法: ar project init <projectId>');
+  }
+
+  const project = await repos.getProject(projectId);
+  if (!project) {
+    output.fatal(`项目不存在: ${projectId}`);
+  }
+
+  output.log(`🔍 正在初始化项目 "${project.name}" (${project.path})...`);
+  const profile = await projectInit.quickInit(projectId, project.path);
+
+  if (output.isJsonMode()) {
+    output.json(profile);
+  } else {
+    output.success('初始化完成');
+    output.log(`  技术栈: ${profile.techStack.join(', ') || '（未识别）'}`);
+    output.log(`  文件数: ${profile.fileCount}  目录数: ${profile.dirCount}`);
+    output.log(`  Git: ${profile.hasGit ? '✅' : '❌'}`);
+    output.log(`  README: ${profile.hasReadme ? '✅' : '❌'}`);
+    output.log(`  依赖: ${Object.keys(profile.dependencies).length} 个`);
+  }
 }

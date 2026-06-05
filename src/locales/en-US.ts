@@ -49,6 +49,7 @@ export default {
       pm: 'Describe requirements, Reasonix (PM) will decompose into tasks...',
       codeReview: 'Enter file paths to review (comma separated) or review focus...',
     },
+    firstMessageHint: '💡 Try sending your first request — the Agent will handle it',
     noSession: 'Select or create a session',
     noProject: 'Please select a project first',
     user: 'You',

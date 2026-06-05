@@ -107,4 +107,12 @@ export function registerProjectHandlers(ipcMain: IpcMain, manager?: AgentManager
     fs.writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf-8');
     return { written: true };
   });
+
+  // Issue #22: 快速初始化项目（检测技术栈、存储画像）
+  h(ipcMain, 'project:quickInit', async (_e, projectId: string) => {
+    const project = await repo.getProject(projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+    const { quickInit } = await import('../project-initializer');
+    return quickInit(projectId, project.path);
+  });
 }

@@ -22,6 +22,7 @@ let _db = null;
 let _manager = null;
 let _credentials = null;
 let _repos = null;
+let _projectInit = null;
 let _initialized = false;
 
 /**
@@ -70,6 +71,9 @@ export async function init() {
   // 6. 加载 repository
   _repos = require(path.join(DIST_ELECTRON, 'database/repository'));
 
+  // 7. 加载 project-initializer
+  _projectInit = require(path.join(DIST_ELECTRON, 'project-initializer'));
+
   _initialized = true;
   return getModules();
 }
@@ -83,6 +87,7 @@ export function getModules() {
     manager: _manager,
     credentials: _credentials,
     repos: _repos,
+    projectInit: _projectInit,
   };
 }
 

@@ -153,6 +153,9 @@ contextBridge.exposeInMainWorld('db', {
 
   /** Phase 7 #33: 初始化项目级 Agent 记忆目录 */
   initAgentDirs: (projectPath: string) => ipcRenderer.invoke('project:initAgentDirs', projectPath),
+
+  /** Issue #22: 快速初始化项目（检测技术栈、存储画像） */
+  quickInit: (projectId: string) => ipcRenderer.invoke('project:quickInit', projectId),
 });
 
 // ── Credentials API ──

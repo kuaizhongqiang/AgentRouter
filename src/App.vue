@@ -157,6 +157,11 @@
         {{ currentProject ? $t('chat.noSession') : $t('chat.noProject') }}
       </div>
 
+      <!-- Issue #22: 首次消息引导 -->
+      <div v-if="currentSession && messages.length === 0" class="first-message-hint">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>{{ $t('chat.firstMessageHint') }}</span>
+      </div>
       <div class="input-bar" v-if="currentSession" style="position:relative">
         <!-- 斜杠命令面板 -->
         <div v-if="showCommandPalette" class="command-palette">
@@ -699,8 +704,13 @@ function onOnboardingSelectAgent(aName) {
 
 function onOnboardingFinished() {
   localStorage.setItem('onboarding_done', 'true')
-  // 引导完成后，如果还没有加载出项目（用户跳过了创建步骤），则刷新
   loadProjects()
+  // 引导完成后后台快速初始化项目
+  setTimeout(async () => {
+    if (currentProject.value?.id) {
+      try { await db.quickInit(currentProject.value.id) } catch (e) { console.warn('[QuickInit]', e) }
+    }
+  }, 500)
 }
 
 
@@ -1588,6 +1598,24 @@ body {
 .agent-pm { background: var(--bg-badge-pm); color: var(--color-agent-pm); }
 
 /* ═══ 输入栏 ═══ */
+.first-message-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin: 0 8px 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: var(--bg-msg-reasoning);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  opacity: 0.7;
+}
+.first-message-hint svg {
+  flex-shrink: 0;
+  color: var(--color-reasoning);
+}
 .input-bar {
   display: flex; gap: 8px; padding: 10px 16px;
   border-top: 1px solid var(--color-border);
