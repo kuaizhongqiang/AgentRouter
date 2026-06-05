@@ -123,6 +123,7 @@ group('CLI 文件完整性');
     'cli/commands/clean.mjs',
     'cli/commands/env.mjs',
     'cli/commands/watch.mjs',
+    'cli/commands/remote.mjs',
   ];
 
   for (const f of requiredFiles) {

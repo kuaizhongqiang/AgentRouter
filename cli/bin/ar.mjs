@@ -214,6 +214,13 @@ async function main() {
       break;
     }
 
+    // ── 远程连接 (Phase B) ──
+    case 'remote': {
+      const { default: handler } = await import('../commands/remote.mjs');
+      await handler(positional.slice(1), options);
+      break;
+    }
+
     // ── list 简写 ──
     case 'list':
     case 'ls': {

@@ -22,6 +22,7 @@ import { OpenCodeAdapter } from './agents/opencode';
 import { ClineAdapter } from './agents/cline';
 import { ContinueAdapter } from './agents/continue';
 import { registerAllHandlers } from './ipc/index';
+import { startApiServer } from './server/http-api';
 
 let mainWindow: BrowserWindow | null = null;
 let agentManager: AgentManager | null = null;
@@ -327,6 +328,20 @@ async function runStartupSequence(): Promise<void> {
 
   // ═══ Phase: SESSION_RESTORE — 会话恢复主要是前端职责，后端提供数据支持 ═══
   sendStartupStatus('SESSION_RESTORE', 'skipped', '会话恢复由前端处理');
+
+  // ═══ Phase B: HTTP API Server（可选，由 AGENTROUTER_ENABLE_API 控制） ═══
+  if (process.env.AGENTROUTER_ENABLE_API === '1' || process.env.AGENTROUTER_API_PORT) {
+    sendStartupStatus('INIT', 'running', '正在启动 HTTP API Server...');
+    try {
+      const apiPort = parseInt(process.env.AGENTROUTER_API_PORT || '18080', 10);
+      const apiToken = process.env.AGENTROUTER_API_TOKEN || '';
+      startApiServer(agentManager, { port: apiPort, token: apiToken });
+      sendStartupStatus('INIT', 'done', `HTTP API Server 已启动 (端口 ${apiPort})`);
+    } catch (err) {
+      console.error('[API] Failed to start:', err);
+      sendStartupStatus('INIT', 'error', 'HTTP API Server 启动失败');
+    }
+  }
 
   // ═══ Phase: READY — 就绪 ═══
   if (errors.length > 0) {

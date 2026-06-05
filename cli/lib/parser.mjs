@@ -142,6 +142,7 @@ Agent 管理:
   env                      环境信息
   clean                    清理构建产物
   watch                    监听文件变化
+  remote                   远程连接 (C/S 模式)
   version                  显示版本
   help [command]           显示帮助
 
