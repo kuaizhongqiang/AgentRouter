@@ -61,7 +61,6 @@ async function main() {
     case 'feat':
     case 'review':
     case 'refactor':
-    case 'test':
     case 'doc':
     case 'goal': {
       const { default: handler } = await import('../commands/exec.mjs');
@@ -126,6 +125,21 @@ async function main() {
     // ── Token ──
     case 'token': {
       const { default: handler } = await import('../commands/token.mjs');
+      await handler(positional.slice(1), options);
+      break;
+    }
+
+    // ── 编译 (Issue #58) ──
+    case 'build':
+    case 'rebuild': {
+      const { default: handler } = await import('../commands/build.mjs');
+      await handler(positional.slice(0), options);
+      break;
+    }
+
+    // ── 测试 (Issue #58) ──
+    case 'test': {
+      const { default: handler } = await import('../commands/test.mjs');
       await handler(positional.slice(1), options);
       break;
     }

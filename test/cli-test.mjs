@@ -242,6 +242,32 @@ group('help 命令');
   assertIncludes(execHelp.stdout, 'agent', 'exec help mentions agent param');
 })();
 
+group('build 命令 (Issue #58)');
+
+(function testBuild() {
+  const help = run(['build', '--help'], { timeout: 5000 });
+  assertEq(help.status, 0, 'ar build --help exits 0');
+  assertIncludes(help.stdout, 'dist-electron', 'build help mentions dist-electron');
+
+  const list = run(['build', '--list'], { timeout: 15000 });
+  assertEq(list.status, 0, 'ar build --list exits 0');
+  assertIncludes(list.stdout, 'codewhale', 'build --list shows codewhale');
+  assertIncludes(list.stdout, 'reasonix', 'build --list shows reasonix');
+})();
+
+group('test 命令 (Issue #58)');
+
+(function testTest() {
+  const help = run(['test', '--help'], { timeout: 5000 });
+  assertEq(help.status, 0, 'ar test --help exits 0');
+  assertIncludes(help.stdout, 'run', 'test help shows run subcommand');
+
+  const list = run(['test', 'list'], { timeout: 15000 });
+  assertEq(list.status, 0, 'ar test list exits 0');
+  assertIncludes(list.stdout, 'cli-test', 'test list shows cli-test');
+  assertIncludes(list.stdout, 'phase7-test', 'test list shows phase7-test');
+})();
+
 group('快捷命令解析');
 
 (function testShortcuts() {
