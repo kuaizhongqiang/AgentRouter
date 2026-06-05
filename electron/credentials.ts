@@ -89,7 +89,7 @@ export function getCredentialsEnv(): Record<string, string> {
     DEEPCODE_REASONING_EFFORT: 'max',
 
     // Cline — 注入通用 + 专用变量
-    CLINE_MODEL: 'openai/gpt-4o',
+    CLINE_MODEL: 'deepseek-v4-flash',
     ANTHROPIC_API_KEY: apiKey,
     ANTHROPIC_BASE_URL: baseUrl,
 

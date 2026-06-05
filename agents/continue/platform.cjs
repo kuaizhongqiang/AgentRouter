@@ -60,7 +60,9 @@ function ensureTempConfig() {
   }
 
   const configPath = path.join(configDir, 'config.yaml');
-  const configContent = `experimental: { inline_diffs: true }
+  const configContent = `name: agentrouter
+version: 1
+experimental: { inline_diffs: true }
 models:
   - title: DeepSeek
     provider: deepseek

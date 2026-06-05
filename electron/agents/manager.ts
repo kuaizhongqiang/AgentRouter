@@ -24,6 +24,28 @@ export interface AgentHealthStatus {
   checkedAt: string | null;
 }
 
+/** 按 Agent 名称过滤凭证环境变量，避免跨 Agent 变量污染 */
+const AGENT_ENV_PREFIXES: Record<string, string[]> = {
+  codewhale: ['DEEPSEEK_', 'CODEWHALE_', 'OPENAI_', 'AGENTROUTER_'],
+  reasonix:  ['DEEPSEEK_', 'CODEWHALE_', 'AGENTROUTER_'],
+  deepcode:  ['DEEPCODE_', 'AGENTROUTER_'],
+  opencode:  ['OPENAI_', 'AGENTROUTER_'],    // 排除 ANTHROPIC 避免触发 Anthropic provider
+  cline:     ['CLINE_', 'ANTHROPIC_', 'AGENTROUTER_'],
+  continue:  ['CONTINUE_', 'AGENTROUTER_'],
+};
+
+function filterCredentialsEnv(agentName: string): Record<string, string> {
+  const all = getCredentialsEnv();
+  const prefixes = AGENT_ENV_PREFIXES[agentName] ?? ['AGENTROUTER_'];
+  const filtered: Record<string, string> = {};
+  for (const [key, value] of Object.entries(all)) {
+    if (prefixes.some(p => key.startsWith(p))) {
+      filtered[key] = value;
+    }
+  }
+  return filtered;
+}
+
 export class AgentManager {
   private adapters = new Map<string, AgentAdapter>();
   private runningProcesses = new Map<string, { proc: import('child_process').ChildProcess; logId: string }>();
@@ -183,8 +205,8 @@ export class AgentManager {
       execOptions.context = context;
       execOptions.env = { ...process.env, AGENTROUTER_CONTEXT: JSON.stringify(context) };
     }
-    // 注入统一凭证环境变量（覆盖各 CLI 对应的变量名）
-    const credentialsEnv = getCredentialsEnv();
+    // 注入按 Agent 过滤后的凭证环境变量
+    const credentialsEnv = filterCredentialsEnv(agentName);
     if (Object.keys(credentialsEnv).length > 0) {
       execOptions.env = {
         ...process.env,
@@ -421,8 +443,8 @@ export class AgentManager {
         resolve({ success: false, error: `Timeout (${timeoutMs}ms)` });
       }, timeoutMs);
 
-      // 注入凭据环境变量，使 Agent doctor 能读取 API Key (如 deepcode 需要 DEEPCODE_API_KEY)
-      const credentialsEnv = getCredentialsEnv();
+      // 注入按 Agent 过滤后的凭证环境变量
+      const credentialsEnv = filterCredentialsEnv(agentName);
       const proc = adapter.spawnDoctor({
         env: { ...process.env, ...credentialsEnv },
       });
