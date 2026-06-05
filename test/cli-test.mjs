@@ -190,9 +190,25 @@ group('doctor 命令');
 group('project 命令');
 
 (function testProject() {
+  // 创建测试项目
+  const created = run(['project', 'create', 'test-ci', '/tmp/test-ci'], { timeout: 10000 });
+  assertEq(created.status, 0, 'ar project create exits 0');
+  assertIncludes(created.stdout, '已创建', 'project create success message');
+
   const list = run(['project', 'list'], { timeout: 10000 });
   assertEq(list.status, 0, 'ar project list exits 0');
   assertIncludes(list.stdout, 'id', 'project list shows header');
+
+  // 清理
+  if (created.status === 0) {
+    const listJson = run(['project', 'list', '--json'], { timeout: 10000 });
+    try {
+      const projects = JSON.parse(listJson.stdout);
+      for (const p of projects) {
+        if (p.name === 'test-ci') run(['project', 'rm', p.id, '--yes'], { timeout: 5000 });
+      }
+    } catch {}
+  }
 })();
 
 group('session 命令');
@@ -237,7 +253,9 @@ group('credential 命令');
 (function testCredential() {
   const show = run(['credential', 'show'], { timeout: 10000 });
   assertEq(show.status, 0, 'ar credential show exits 0');
-  assertIncludes(show.stdout, 'sk-', 'credential shows masked API key');
+  // 有或无 API Key 都算通过（CI 环境可能无 key），只要格式正确
+  const hasKey = show.stdout.includes('sk-') || show.stdout.includes('未设置');
+  assert(hasKey, 'credential show output valid');
 })();
 
 group('help 命令');
