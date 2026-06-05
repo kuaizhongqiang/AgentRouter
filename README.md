@@ -1,119 +1,166 @@
 # AgentRouter
 
-多 Agent 协同桌面平台。将多个开源编程助手 CLI（CodeWhale / Reasonix / Deep Code / OpenCode / Cline / Continue）整合到统一界面中，让它们协同完成同一个项目。
+> 多 Agent 协作桌面平台——编排多个 AI 编码助手，统一管理、统一调度。
 
-> **核心理念**：平台模拟"人"来调用 CLI。只做两件事：**调用**（spawn 子进程）和**维护**（记消息、记任务、存日志）。不做代码能力增强。
->
-> ⚠️ **警告：AgentRouter 默认以 YOLO 模式运行，Agent 拥有操作文件系统的能力。**
-> 平台设计目标是**最大自由度**而非最大安全性。Agent 可能在执行中修改、创建或删除文件。
-> **强烈建议在沙箱环境、虚拟机或 Git 可回滚的仓库中使用。**
-> 具体安全级别可通过设置面板调整（YOLO / 标准 / 保守）。
+AgentRouter 将 6 个 AI 编码 CLI 工具集成到一个 Electron + Vue 3 桌面应用中，提供统一的界面和 CLI 接口。平台本身**不写代码**——它只负责**调用**（启动 CLI 子进程）和**管理**（消息、任务、日志、记忆）。
 
----
+![CI](https://github.com/kuaizhongqiang/AgentRouter/actions/workflows/ci.yml/badge.svg)
 
 ## 快速开始
 
+### 安装
+
 ```bash
-npm install        # 安装依赖
-npm run dev        # 启动开发模式
-build.bat          # 一键构建生产包
+# CLI 工具（推荐）
+npm install -g agent-router
+
+# 或下载桌面端安装包
+# 从 GitHub Releases 下载 AgentRouter-*.exe
 ```
 
-详细的从零搭建指南（环境要求 / 凭证配置 / Agent 构建 / 首次使用）见 **[`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md)**。
+### 配置 API Key
 
----
-
-## 核心特性
-
-### 🧠 多 Agent 调度
-- 集成 6 个编码助手：CodeWhale / Reasonix / Deep Code / OpenCode / Cline / Continue
-- 6 种执行模式：对话 / PM 拆解 / YOLO / 审批 / 逐步 / 预览
-- Reasonix（PM）自动拆解需求 → 结构化任务列表 → 并行调度
-- 执行中动态调整（suggestion）+ 冲突检测 + 信号量并发控制
-
-### 🖥️ 桌面体验
-- 三栏拖拽布局（Splitpanes）| 浅色/深色主题 | 系统托盘
-- 全局快捷键（`Ctrl+Shift+A` 唤出 / `Ctrl+Shift+H` 隐藏）
-- 原生通知 | 顶部菜单栏 | 国际化（中文/英文）
-- 首次引导向导 | 全局设置页面 | 项目级配置 `agentrouter.json`
-
-### 🔧 开发效率
-- `/` 斜杠命令面板（`/fix` `/feat` `/review` `/refactor` `/test` `/doc`）
-- 任务模板（修复 Bug / 添加功能 / 代码审查）
-- Diff 审查面板 | 代码审查模式（文件选择 → 自动审查 → 接受/拒绝）
-- Session 回放 | Token 用量统计
-
-### 🏗️ 架构能力
-- 统一凭证管理（`~/.agentrouter/credentials.json`）
-- Agent 数据路径统一（`~/.agentrouter/agents/`）
-- MCP 工具注入（file / git / web fetch）
-- 插件系统设计（文档方案，生命周期钩子 + 安全沙箱）
-
----
-
-## 架构概览
-
-```
-electron/           Electron 主进程（TypeScript）
-  ├── main.ts        窗口管理 / Tray / 通知 / 快捷键 / 菜单栏
-  ├── preload.ts     contextBridge API
-  ├── ipc/           领域拆分 IPC 处理器（项目/对话/消息/任务/Agent/凭证）
-  ├── database/      SQLite (sql.js WASM) + 迁移 v1-v6
-  ├── agents/        Agent 适配器层（Adapter 模式，6 个 CLI 适配器）
-  ├── scheduler/     并行调度引擎（冲突检测 + 信号量）
-  └── mcp/           MCP Server（file / git / web 工具）
-
-src/                Vue 3 前端
-  ├── App.vue        三栏主界面
-  ├── Settings.vue   设置面板
-  ├── Onboarding.vue 首次引导
-  ├── DiffPanel.vue  Diff 审查
-  └── locales/       国际化（中文/英文）
-
-agents/             开源 CLI 源码 Fork（仅 I/O 接口层改动）
-ProjectVision/      愿景文档体系（架构基准）
-docs/               设计文档（协议/场景/审计/测试/插件设计）
+```bash
+ar credential set --apiKey sk-xxx --baseUrl https://api.deepseek.com
 ```
 
----
+### 创建项目并执行
+
+```bash
+# 创建项目
+ar project create MyApp /path/to/myapp
+
+# 运行 Agent
+ar exec codewhale "分析项目结构并输出摘要"
+
+# 诊断系统状态
+ar diag
+```
+
+## 集成 Agent
+
+| Agent | 类型 | 用途 |
+|-------|------|------|
+| **CodeWhale** | Rust 二进制 | 快速编码执行，多进程并行 |
+| **Reasonix** | Node.js/TS | 长上下文推理，PM 模式 |
+| **Deep Code** | Node.js/TS | 深度推理编码，推理强度可调 |
+| **OpenCode** | Go 二进制 | 多模型通用编码，LSP 集成 |
+| **Cline** | npm 二进制 | 全能自主编码，15+ 模型提供商 |
+| **Continue** | npm 二进制 | 代码库理解，35+ 模型提供商 |
+
+### 构建 Agent
+
+```bash
+# CodeWhale（需要 Rust 1.88+）
+cd agents/codewhale && cargo build --release -p codewhale-cli -p codewhale-tui
+
+# Reasonix
+cd agents/reasonix && npm run build
+
+# OpenCode（需要 Go 1.24+）
+cd agents/opencode && go build -o ar-opencode.exe .
+
+# Cline & Continue（npm 全局安装）
+npm install -g @cline/cli @continuedev/cli
+```
+
+## CLI 命令
+
+```
+ar <command> [subcommand] [args...]
+
+核心命令:
+  exec <agent> <指令>      执行 Agent
+  doctor [agent]           健康诊断
+  status                   全局状态
+  diag                     深度体检
+
+项目管理:
+  project list             列出项目
+  project create <name> <path>  创建项目
+  project init <id>        项目初始化扫描
+  project rm <id>          删除项目
+
+会话与任务:
+  session list/create/rm   会话管理
+  task list/approve        任务管理
+  msg list <session>       消息历史
+
+Agent 管理:
+  agent list               列出 Agent
+  agent info <name>        查看详情
+
+构建与测试:
+  build                    编译后端
+  test run                 运行测试
+
+工具:
+  db <sql>                 查询数据库
+  log <agent>              查看日志
+  git status/diff          集成 Git
+  credential show/set      凭证管理
+  clean                    清理产物
+
+全局选项:
+  --json                   JSON 输出
+  --project <id>           指定项目
+```
+
+## 执行模式
+
+| 模式 | 说明 |
+|------|------|
+| 对话 | 直接与 Agent 对话 |
+| PM 拆解 | PM 拆解需求 → 分派任务 → 并行执行 |
+| YOLO | 自动审批，全速执行 |
+| 审批 | 每步需用户确认 |
+| 逐步 | 按并行组分步确认 |
+| 预览 | 仅生成计划，不执行 |
+
+## 开发
+
+```bash
+# 环境要求
+node >= 22
+npm >= 10
+
+# 安装依赖
+npm install --ignore-scripts
+
+# 编译后端
+npm run build:electron
+
+# 开发模式（前端 + Electron 热更新）
+npm run electron:dev
+
+# 生产构建
+npm run build && npm run build:electron && npm run electron:build
+
+# 运行测试
+node test/runtime-test-2.mjs   # 集成测试（100 项）
+node cli/bin/ar.mjs test run --cli  # CLI 测试（82 项）
+```
 
 ## 数据存储
 
-| 位置 | 内容 |
-|---|---|
-| `~/.agentrouter/agentrouter.db` | SQLite 数据库：项目 / 对话 / 消息 / 任务 / Agent 日志 / 记忆 / 任务模板 / Token 用量 |
-| `~/.agentrouter/credentials.json` | 统一凭证（API Key / Base URL） |
-| `~/.agentrouter/projects/{id}/sessions/{id}/events/` | Agent 执行日志（JSON Lines） |
-| `{project}/agentrouter.json` | 项目级配置（覆盖全局默认值） |
+- **数据库**: `~/.agentrouter/agentrouter.db` (sql.js WASM)
+- **日志**: `~/.agentrouter/projects/<id>/sessions/<id>/events/*.jsonl`
+- **凭证**: `~/.agentrouter/credentials.json`
+- **记忆**: `memories` 表（按项目 + Agent 索引）
 
----
+## 架构
 
-## 通信协议
+```
+Electron Main Process
+├── Agent Layer — 6 个 Agent 适配器 + NDJSON 事件流
+├── Data Layer — sql.js + 迁移 + CRUD
+├── IPC Layer — 50+ 处理程序，错误统一包装
+├── Scheduler — 并行组调度 + 文件冲突检测
+├── MCP Server — 文件/搜索/Wiki/Git 工具
+├── CLI — 独立于 Electron 的终端命令
+└── Project Initializer — 技术栈检测 + 项目画像
+```
 
-平台与 CLI 之间通过 stdin/stdout 传输 [JSON Lines](https://jsonlines.org/) 事件流，协议对齐 MCP 标准。详见 [`docs/PROTOCOL.md`](docs/PROTOCOL.md)。
+## License
 
----
-
-## 集成项目
-
-| 项目 | 许可证 | 集成方式 |
-|---|---|---|
-| [CodeWhale](https://github.com/CodeWhaleTeam/codewhale) | MIT | 源码 Fork + `--platform-mode` |
-| [DeepSeek-Reasonix](https://github.com/esengine/DeepSeek-Reasonix) | MIT | 源码 Fork + `platform` 子命令 |
-| [Deep Code CLI](https://github.com/lessweb/deepcode-cli) | MIT | 源码 Fork + `platform` 子命令 |
-| [OpenCode](https://github.com/opencode-ai/opencode) | Apache-2.0 | 源码 Fork + `platform` 子命令 |
-| [Cline](https://github.com/cline/cline) | Apache-2.0 | 包装层 + npm 二进制 |
-| [Continue](https://github.com/continuedev/continue) | Apache-2.0 | 包装层 + npm 二进制 |
-
-各项目许可证见对应 `agents/{project}/LICENSE`，改动记录见 `FORK.md`。
-
----
-
-## 代码仓库
-
-本项目同步托管于两个平台：
-
-| 平台 | 地址 |
-|---|---|
-| 🐙 **GitHub** | <https://github.com/kuaizhongqiang/AgentRouter> |
-| 🟢 **GitCode** | <https://gitcode.com/m0_61563124/AgentRouter> |
+MIT

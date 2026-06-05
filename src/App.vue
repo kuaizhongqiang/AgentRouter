@@ -129,7 +129,10 @@
               {{ m.role === 'user' ? $t('chat.user') : m.role === 'system' ? $t('chat.system') : m.role }}
             </template>
           </div>
-          <div class="msg-content" :class="{ 'reasoning-content': m.role === 'reasoning' }">{{ m.content }}</div>
+          <div class="msg-content" :class="{ 'reasoning-content': m.role === 'reasoning' }">
+            <MarkdownRenderer v-if="m.role !== 'reasoning'" :content="m.content" />
+            <template v-else>{{ m.content }}</template>
+          </div>
           <!-- 代码审查：接受 / 拒绝 -->
           <div v-if="m.role === 'agent' && selectedMode === '代码审查' && m.content && !m._reviewDone" class="review-actions">
             <button class="btn-review-accept" @click="acceptReview(m)">
@@ -420,6 +423,7 @@ import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
 import Settings from './Settings.vue'
 import Onboarding from './Onboarding.vue'
+import MarkdownRenderer from './MarkdownRenderer.vue'
 import DiffPanel from './DiffPanel.vue'
 
 const { t } = useI18n()

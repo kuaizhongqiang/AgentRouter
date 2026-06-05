@@ -1,5 +1,7 @@
 {
   "name": "agent-router",
+  "description": "Multi-agent collaborative desktop platform — orchestrate AI coding assistants",
+  "author": "AgentRouter Contributors",
   "version": "0.1.0",
   "type": "module",
   "main": "dist-electron/main.js",
