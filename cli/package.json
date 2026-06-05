@@ -1,0 +1,12 @@
+{
+  "name": "@agentrouter/cli",
+  "version": "0.1.0",
+  "description": "AgentRouter CLI — 桌面端的终端等价物",
+  "type": "module",
+  "bin": {
+    "ar": "./bin/ar.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
