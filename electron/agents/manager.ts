@@ -421,7 +421,11 @@ export class AgentManager {
         resolve({ success: false, error: `Timeout (${timeoutMs}ms)` });
       }, timeoutMs);
 
-      const proc = adapter.spawnDoctor();
+      // 注入凭据环境变量，使 Agent doctor 能读取 API Key (如 deepcode 需要 DEEPCODE_API_KEY)
+      const credentialsEnv = getCredentialsEnv();
+      const proc = adapter.spawnDoctor({
+        env: { ...process.env, ...credentialsEnv },
+      });
       proc.on('error', (err) => {
         clearTimeout(timer);
         resolve({ success: false, error: err.message });

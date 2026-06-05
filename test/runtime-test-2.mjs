@@ -122,9 +122,9 @@ async function main() {
   assertEq(cwm.identity.id, 'ar-codewhale', 'codewhale manifest identity.id');
   assertEq(cwm.identity.label, 'CodeWhale', 'codewhale manifest identity.label');
   assertEq(cwm.identity.version, '0.8.46', 'codewhale manifest identity.version');
-  assertEq(cwm.tagline, 'DeepSeek 深度整合，推理型编码小能手', 'codewhale manifest tagline');
-  assertDeep(cwm.best_for, ['代码生成与实现', '功能模块开发', '代码重构', '单元测试'], 'codewhale manifest best_for');
-  assertDeep(cwm.not_for, ['长上下文综合分析', '安全审计'], 'codewhale manifest not_for');
+  assertEq(cwm.tagline, '快速编码执行器，多进程并行高效实现', 'codewhale manifest tagline');
+  assertDeep(cwm.best_for, ['快速功能模块开发', '代码生成与实现', '代码重构', '单元测试编写', 'Bug修复', '批量简单并行任务'], 'codewhale manifest best_for');
+  assertDeep(cwm.not_for, ['长上下文综合分析', '安全审计', '复杂架构设计', '多步骤复杂自主任务'], 'codewhale manifest not_for');
   assertEq(cwm.execution_model.parallel_mode, 'multi-process', 'codewhale manifest execution_model.parallel_mode');
   assertEq(cwm.execution_model.max_instances, 4, 'codewhale manifest execution_model.max_instances');
   assertEq(cwm.context_budget.preferred_read_mode, 'incremental', 'codewhale manifest context_budget.preferred_read_mode');

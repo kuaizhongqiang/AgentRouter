@@ -110,22 +110,31 @@ export default async function handler(args, options) {
     const logPath = path.join(eventsDir, `${agentName}.jsonl`);
 
     let reply = '';
+    let progressContent = '';
 
     if (fs.existsSync(logPath)) {
       const raw = fs.readFileSync(logPath, 'utf-8');
       const lines = raw.split('\n').filter(l => l.trim());
 
-      // 从后向前查找首个 completion 事件
-      for (let i = lines.length - 1; i >= 0; i--) {
+      // 优先尝试从 completion 事件提取回复（部分 Agent 如此结构）
+      // 并同时收集 progress content 事件作为备选
+      for (const line of lines) {
         try {
-          const ev = JSON.parse(lines[i]);
+          const ev = JSON.parse(line);
           if (ev.type === 'event' && ev.event === 'completion') {
             reply = ev.data?.summary || ev.data?.content || ev.data?.response || '';
-            if (reply) break;
+          }
+          if (ev.type === 'event' && ev.event === 'progress' && ev.data?.type === 'content') {
+            progressContent += ev.data?.content || '';
           }
         } catch {
           // 跳过不可解析的行
         }
+      }
+
+      // 如果 completion 事件没有回复内容，用 progress content 拼接
+      if (!reply && progressContent) {
+        reply = progressContent;
       }
     }
 
